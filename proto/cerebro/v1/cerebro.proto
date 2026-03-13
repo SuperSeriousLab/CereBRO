@@ -1,0 +1,242 @@
+// CereBRO Contracts v1
+//
+// Biomimetic cognitive architecture types.
+// Phase 1: InhibitionAction, InhibitionDecision, CerebroReport.
+// Phase 2: GainMode, GainSignal, ThresholdAdjustments.
+// Phase 3: ValidationResult, ToxicityResult, LanguageResult.
+// Phase 4: ConfidenceRecommendation, SelfConfidenceReport, FeedbackRequest, FeedbackResponse.
+// Phase 5: ConsolidationTrigger, SalienceScore, ConsolidationEntry.
+
+syntax = "proto3";
+
+package cerebro.v1;
+
+option go_package = "github.com/SuperSeriousLab/CereBRO/gen/go/cerebro/v1;cerebrov1";
+
+import "cog/reasoning/v1/reasoning.proto";
+import "google/protobuf/timestamp.proto";
+
+
+// =============================================================================
+// Enums
+// =============================================================================
+
+// Gating decision for a single finding.
+enum InhibitionAction {
+  INHIBITION_ACTION_UNSPECIFIED = 0;
+  INHIBITED = 1;      // Finding suppressed (default state)
+  DISINHIBITED = 2;   // Finding passed through (evidence sufficient)
+}
+
+// Operating mode of the neuromodulatory system (Phase 2).
+enum GainMode {
+  GAIN_MODE_UNSPECIFIED = 0;
+  PHASIC = 1;   // Focused, high-gain processing (high urgency, narrow attention)
+  TONIC = 2;    // Broad, low-gain scanning (low urgency, wide attention)
+}
+
+// System recommendation based on self-assessed confidence (Phase 4).
+enum ConfidenceRecommendation {
+  CONFIDENCE_RECOMMENDATION_UNSPECIFIED = 0;
+  HIGH_CONFIDENCE = 1;                   // Report is reliable
+  MODERATE_CONFIDENCE = 2;               // Report is likely correct
+  LOW_CONFIDENCE_REVIEW_RECOMMENDED = 3; // Human review recommended
+}
+
+// What caused a memory consolidation event (Phase 5).
+enum ConsolidationTrigger {
+  CONSOLIDATION_TRIGGER_UNSPECIFIED = 0;
+  CONSOLIDATION_USER_FEEDBACK = 1;      // Explicit user confirm/reject
+  CONSOLIDATION_HIGH_CONFIDENCE = 2;    // All findings above confidence threshold
+  CONSOLIDATION_NOVEL_PATTERN = 3;      // Finding combination not seen before
+  CONSOLIDATION_PERIODIC_SWEEP = 4;     // Scheduled consolidation
+}
+
+
+// =============================================================================
+// Layer 0: Brainstem Reflexes (Phase 3)
+// =============================================================================
+
+// Result of format validation (format-validator COG).
+// Designed for future use at the network boundary accepting raw bytes.
+// Current pipeline validates already-parsed ConversationSnapshot fields.
+message ValidationResult {
+  bool valid = 1;
+  bytes input_bytes = 2;                 // raw input (if available)
+  string rejection_reason = 3;           // empty if valid
+  uint32 input_size_bytes = 4;
+}
+
+// Result of toxicity screening (toxicity-gate COG).
+message ToxicityResult {
+  bool toxic = 1;
+  bytes input_bytes = 2;                 // raw input (if available)
+  repeated string matched_patterns = 3;  // blocklist terms that matched
+  double toxicity_score = 4;             // 0.0-1.0
+}
+
+// Result of language detection (language-detector COG).
+message LanguageResult {
+  string language_code = 1;              // ISO 639-1 (e.g. "en", "de")
+  double confidence = 2;                 // 0.0-1.0
+  bool supported = 3;                    // true if language_code is in supported set
+  bytes input_bytes = 4;                 // raw input (if available)
+}
+
+
+// =============================================================================
+// Layer 1: Neuromodulation (Phase 2)
+// =============================================================================
+
+// Broadcast from the urgency-assessor to Layer 2/3 COGs.
+// Models norepinephrine gain modulation.
+message GainSignal {
+  double urgency = 1;                    // 0.0-1.0 (0=casual, 0.5=professional, 1.0=emergency)
+  double complexity = 2;                 // 0.0-1.0 (0=simple Q&A, 0.5=discussion, 1.0=complex negotiation)
+  double formality = 3;                  // 0.0-1.0 (0=very informal, 0.5=neutral, 1.0=academic/legal)
+  GainMode mode = 4;                     // PHASIC (focused) or TONIC (broad)
+  string conversation_id = 5;           // for correlation
+}
+
+// Gain offset broadcast from threshold-modulator to Layer 2 detectors.
+message ThresholdAdjustments {
+  map<string, double> adjustments = 1;   // detector_name → gain_offset [-0.5, +0.5]
+  GainMode source_mode = 2;             // which mode generated these adjustments
+}
+
+
+// =============================================================================
+// Layer 3: Inhibition
+// =============================================================================
+
+// Per-finding gating decision from the Context Inhibitor.
+message InhibitionDecision {
+  string finding_id = 1;                       // identifies which CognitiveAssessment
+  InhibitionAction action = 2;                 // INHIBITED or DISINHIBITED
+  string reason = 3;                           // machine-readable reason code
+  double corroboration_score = 4;              // 0.0-1.0, cross-detector support
+  string detector_name = 5;                    // which detector produced the finding
+  cog.reasoning.v1.FindingType finding_type = 6;
+}
+
+
+// =============================================================================
+// Layer 3: Salience (Phase 5)
+// =============================================================================
+
+// Per-finding salience rating from the salience-filter.
+message SalienceScore {
+  string finding_id = 1;                 // identifies which CognitiveAssessment
+  double score = 2;                      // 0.0-1.0, composite salience
+  double novelty = 3;                    // 0.0-1.0, how unique this finding type is
+  double actionability = 4;              // 0.0-1.0, how actionable (has evidence, refs)
+  bool above_threshold = 5;             // true if score >= min_salience config
+}
+
+
+// =============================================================================
+// Layer 4: Metacognition (Phase 4)
+// =============================================================================
+
+// System's assessment of its own report reliability.
+message SelfConfidenceReport {
+  double overall_confidence = 1;         // 0.0-1.0, weighted composite
+  double agreement_score = 2;            // 0.0-1.0, cross-detector agreement
+  double margin_score = 3;               // 0.0-1.0, distance from detection thresholds
+  double historical_score = 4;           // 0.0-1.0, accuracy on similar patterns
+  uint32 finding_count = 5;             // how many findings in the report
+  string finding_pattern = 6;           // e.g., "ANCHORING_BIAS+SCOPE_DRIFT"
+  ConfidenceRecommendation recommendation = 7;
+}
+
+// Request from feedback-evaluator to Layer 2 detectors for re-evaluation.
+message FeedbackRequest {
+  uint32 pass_number = 1;               // always 2 (accumulator bound)
+  repeated string reeval_finding_ids = 2; // which findings to re-evaluate
+  cog.reasoning.v1.ReasoningReport original_report = 3; // first-pass synthesis
+  cog.reasoning.v1.ConversationSnapshot context = 4;    // original conversation
+  repeated string synthesis_context = 5; // recommended_actions from first pass
+  string request_id = 6;               // for correlation
+}
+
+// Response from a re-evaluated detector.
+message FeedbackResponse {
+  uint32 pass_number = 1;               // always 2 (matches request)
+  string finding_id = 2;                // which finding was re-evaluated
+  cog.reasoning.v1.CognitiveAssessment updated = 3; // the re-evaluated assessment
+  double confidence_delta = 4;          // change from original confidence
+  string request_id = 5;               // correlation with FeedbackRequest
+}
+
+
+// =============================================================================
+// Layer 5: Memory Consolidation (Phase 5)
+// =============================================================================
+
+// Sparse index entry created by the memory-consolidator for corpus storage.
+// Stores pointers and metadata, not full conversation content (hippocampal indexing).
+message ConsolidationEntry {
+  string conversation_id = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  ConsolidationTrigger trigger = 3;
+
+  // Finding summary (sparse — not full assessments)
+  repeated string finding_types = 4;
+  repeated double finding_confidences = 5;
+  repeated string finding_severities = 6;
+
+  // Inhibition summary
+  uint32 inhibited_count = 7;
+  uint32 disinhibited_count = 8;
+  repeated string inhibition_reasons = 9;
+
+  // Conversation metadata (not content)
+  uint32 turn_count = 10;
+  double formality = 11;
+  double urgency = 12;
+  repeated string domain_markers = 13;
+
+  // Outcome
+  string outcome = 14;                  // "confirmed", "rejected", "auto_confirmed"
+  double outcome_confidence = 15;
+
+  // Detector agreement
+  string detector_pattern = 16;         // e.g., "anchoring+scope+contra"
+
+  // Self-confidence at time of report
+  double self_confidence = 17;
+  bool feedback_applied = 18;
+}
+
+
+// =============================================================================
+// Top-level output
+// =============================================================================
+
+// Final output of the CereBRO pipeline. Embeds a ReasoningReport for backward
+// compatibility — consumers that only understand ReasoningReport can extract
+// the base_report field directly.
+message CerebroReport {
+  cog.reasoning.v1.ReasoningReport base_report = 1;
+
+  // CereBRO extensions
+  repeated InhibitionDecision inhibition_log = 2;
+  bool feedback_applied = 3;
+  uint32 pass_count = 4;                       // 1 (no feedback) or 2 (with feedback)
+
+  // Metadata
+  google.protobuf.Timestamp assessed_at = 5;
+  string conversation_id = 6;
+
+  // Phase 2: Neuromodulation
+  GainSignal gain_signal = 7;
+  ThresholdAdjustments threshold_adjustments = 8;
+
+  // Phase 4: Metacognition
+  SelfConfidenceReport self_confidence = 9;
+
+  // Phase 5: Salience + Consolidation
+  repeated SalienceScore salience_scores = 10;   // per-finding salience
+  bool consolidated = 11;                         // whether this run was indexed
+  ConsolidationTrigger consolidation_trigger = 12; // what triggered consolidation
+}
