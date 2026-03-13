@@ -60,6 +60,7 @@ cerebro/
 │   │   ├── feedback.go                #   Layer 4: feedback evaluator
 │   │   ├── consolidator.go            #   Layer 5: memory consolidator
 │   │   ├── patternindex.go            #   Shared: thread-safe pattern index
+│   │   ├── mlenricher.go              #   ML Enricher (Ollama integration)
 │   │   ├── arch_variants.go           #   Architecture competition variants
 │   │   └── competition.go             #   Competition runner + scoring
 │   └── textutil/                       # Shared text processing

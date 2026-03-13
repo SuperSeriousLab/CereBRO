@@ -9,8 +9,9 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/SuperSeriousLab/CereBRO/internal/textutil"
+	cerebrov1 "github.com/SuperSeriousLab/CereBRO/gen/go/cerebro/v1"
 	reasoningv1 "github.com/SuperSeriousLab/CereBRO/gen/go/cog/reasoning/v1"
+	"github.com/SuperSeriousLab/CereBRO/internal/textutil"
 )
 
 // ============================================================
@@ -500,6 +501,28 @@ func DetectSunkCostProximity(snap *reasoningv1.ConversationSnapshot, cfg SunkCos
 		}
 	}
 	return best
+}
+
+// DetectAnchoringContextML wraps DetectAnchoringContext with ML enrichment.
+// Uses ML anchoring_references relevance scores to filter false positives.
+func DetectAnchoringContextML(snap *reasoningv1.ConversationSnapshot, cfg AnchoringContextConfig, ml *cerebrov1.MLEnrichment) *reasoningv1.CognitiveAssessment {
+	finding := DetectAnchoringContext(snap, cfg)
+	if ml == nil || len(ml.GetAnchoringReferences()) == 0 {
+		return finding
+	}
+
+	if finding != nil && finding.GetAnchoring() != nil {
+		// Check if ML considers the anchor value relevant
+		anchorVal := finding.GetAnchoring().GetAnchorValue()
+		for _, ref := range ml.GetAnchoringReferences() {
+			if ref.GetValue() == anchorVal && ref.GetRelevance() > 0.5 {
+				// ML confirms relevance — boost confidence
+				finding.Confidence = clamp(finding.Confidence+0.1, 0.0, 1.0)
+				return finding
+			}
+		}
+	}
+	return finding
 }
 
 func sunkCostBaseConfidence(cost, cont phraseMatch) float64 {

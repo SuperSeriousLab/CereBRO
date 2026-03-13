@@ -1186,6 +1186,399 @@ func (x *ConsolidationEntry) GetFeedbackApplied() bool {
 	return false
 }
 
+// Structured extraction from a single conversation turn via local LLM.
+type MLEnrichment struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Claims              []*MLClaim             `protobuf:"bytes,1,rep,name=claims,proto3" json:"claims,omitempty"`
+	AnchoringReferences []*MLAnchorRef         `protobuf:"bytes,2,rep,name=anchoring_references,json=anchoringReferences,proto3" json:"anchoring_references,omitempty"`
+	SunkCostPhrases     []string               `protobuf:"bytes,3,rep,name=sunk_cost_phrases,json=sunkCostPhrases,proto3" json:"sunk_cost_phrases,omitempty"`
+	DecisionPoints      []*MLDecisionPoint     `protobuf:"bytes,4,rep,name=decision_points,json=decisionPoints,proto3" json:"decision_points,omitempty"`
+	Formality           *MLFormalityIndicators `protobuf:"bytes,5,opt,name=formality,proto3" json:"formality,omitempty"`
+	ConfidenceMarkers   []string               `protobuf:"bytes,6,rep,name=confidence_markers,json=confidenceMarkers,proto3" json:"confidence_markers,omitempty"`
+	SourceTurn          uint32                 `protobuf:"varint,7,opt,name=source_turn,json=sourceTurn,proto3" json:"source_turn,omitempty"` // which turn this enrichment covers
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *MLEnrichment) Reset() {
+	*x = MLEnrichment{}
+	mi := &file_cerebro_v1_cerebro_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MLEnrichment) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MLEnrichment) ProtoMessage() {}
+
+func (x *MLEnrichment) ProtoReflect() protoreflect.Message {
+	mi := &file_cerebro_v1_cerebro_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MLEnrichment.ProtoReflect.Descriptor instead.
+func (*MLEnrichment) Descriptor() ([]byte, []int) {
+	return file_cerebro_v1_cerebro_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *MLEnrichment) GetClaims() []*MLClaim {
+	if x != nil {
+		return x.Claims
+	}
+	return nil
+}
+
+func (x *MLEnrichment) GetAnchoringReferences() []*MLAnchorRef {
+	if x != nil {
+		return x.AnchoringReferences
+	}
+	return nil
+}
+
+func (x *MLEnrichment) GetSunkCostPhrases() []string {
+	if x != nil {
+		return x.SunkCostPhrases
+	}
+	return nil
+}
+
+func (x *MLEnrichment) GetDecisionPoints() []*MLDecisionPoint {
+	if x != nil {
+		return x.DecisionPoints
+	}
+	return nil
+}
+
+func (x *MLEnrichment) GetFormality() *MLFormalityIndicators {
+	if x != nil {
+		return x.Formality
+	}
+	return nil
+}
+
+func (x *MLEnrichment) GetConfidenceMarkers() []string {
+	if x != nil {
+		return x.ConfidenceMarkers
+	}
+	return nil
+}
+
+func (x *MLEnrichment) GetSourceTurn() uint32 {
+	if x != nil {
+		return x.SourceTurn
+	}
+	return 0
+}
+
+// A claim extracted by the LLM with epistemic metadata.
+type MLClaim struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Text            string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
+	Speaker         string                 `protobuf:"bytes,2,opt,name=speaker,proto3" json:"speaker,omitempty"`
+	SourceTurn      uint32                 `protobuf:"varint,3,opt,name=source_turn,json=sourceTurn,proto3" json:"source_turn,omitempty"`
+	EpistemicStatus string                 `protobuf:"bytes,4,opt,name=epistemic_status,json=epistemicStatus,proto3" json:"epistemic_status,omitempty"` // "certain", "likely", "speculative", etc.
+	EvidenceRefs    []string               `protobuf:"bytes,5,rep,name=evidence_refs,json=evidenceRefs,proto3" json:"evidence_refs,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *MLClaim) Reset() {
+	*x = MLClaim{}
+	mi := &file_cerebro_v1_cerebro_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MLClaim) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MLClaim) ProtoMessage() {}
+
+func (x *MLClaim) ProtoReflect() protoreflect.Message {
+	mi := &file_cerebro_v1_cerebro_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MLClaim.ProtoReflect.Descriptor instead.
+func (*MLClaim) Descriptor() ([]byte, []int) {
+	return file_cerebro_v1_cerebro_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *MLClaim) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+func (x *MLClaim) GetSpeaker() string {
+	if x != nil {
+		return x.Speaker
+	}
+	return ""
+}
+
+func (x *MLClaim) GetSourceTurn() uint32 {
+	if x != nil {
+		return x.SourceTurn
+	}
+	return 0
+}
+
+func (x *MLClaim) GetEpistemicStatus() string {
+	if x != nil {
+		return x.EpistemicStatus
+	}
+	return ""
+}
+
+func (x *MLClaim) GetEvidenceRefs() []string {
+	if x != nil {
+		return x.EvidenceRefs
+	}
+	return nil
+}
+
+// A numeric reference identified by the LLM as potentially anchoring.
+type MLAnchorRef struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Value         float64                `protobuf:"fixed64,1,opt,name=value,proto3" json:"value,omitempty"`
+	Turn          uint32                 `protobuf:"varint,2,opt,name=turn,proto3" json:"turn,omitempty"`
+	Context       string                 `protobuf:"bytes,3,opt,name=context,proto3" json:"context,omitempty"`
+	Relevance     float64                `protobuf:"fixed64,4,opt,name=relevance,proto3" json:"relevance,omitempty"` // 0.0-1.0, how relevant to the discussion
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MLAnchorRef) Reset() {
+	*x = MLAnchorRef{}
+	mi := &file_cerebro_v1_cerebro_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MLAnchorRef) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MLAnchorRef) ProtoMessage() {}
+
+func (x *MLAnchorRef) ProtoReflect() protoreflect.Message {
+	mi := &file_cerebro_v1_cerebro_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MLAnchorRef.ProtoReflect.Descriptor instead.
+func (*MLAnchorRef) Descriptor() ([]byte, []int) {
+	return file_cerebro_v1_cerebro_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *MLAnchorRef) GetValue() float64 {
+	if x != nil {
+		return x.Value
+	}
+	return 0
+}
+
+func (x *MLAnchorRef) GetTurn() uint32 {
+	if x != nil {
+		return x.Turn
+	}
+	return 0
+}
+
+func (x *MLAnchorRef) GetContext() string {
+	if x != nil {
+		return x.Context
+	}
+	return ""
+}
+
+func (x *MLAnchorRef) GetRelevance() float64 {
+	if x != nil {
+		return x.Relevance
+	}
+	return 0
+}
+
+// A decision point identified by the LLM.
+type MLDecisionPoint struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Turn          uint32                 `protobuf:"varint,1,opt,name=turn,proto3" json:"turn,omitempty"`
+	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	ChosenOption  string                 `protobuf:"bytes,3,opt,name=chosen_option,json=chosenOption,proto3" json:"chosen_option,omitempty"`
+	Alternatives  []string               `protobuf:"bytes,4,rep,name=alternatives,proto3" json:"alternatives,omitempty"`
+	Rationale     string                 `protobuf:"bytes,5,opt,name=rationale,proto3" json:"rationale,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MLDecisionPoint) Reset() {
+	*x = MLDecisionPoint{}
+	mi := &file_cerebro_v1_cerebro_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MLDecisionPoint) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MLDecisionPoint) ProtoMessage() {}
+
+func (x *MLDecisionPoint) ProtoReflect() protoreflect.Message {
+	mi := &file_cerebro_v1_cerebro_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MLDecisionPoint.ProtoReflect.Descriptor instead.
+func (*MLDecisionPoint) Descriptor() ([]byte, []int) {
+	return file_cerebro_v1_cerebro_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *MLDecisionPoint) GetTurn() uint32 {
+	if x != nil {
+		return x.Turn
+	}
+	return 0
+}
+
+func (x *MLDecisionPoint) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *MLDecisionPoint) GetChosenOption() string {
+	if x != nil {
+		return x.ChosenOption
+	}
+	return ""
+}
+
+func (x *MLDecisionPoint) GetAlternatives() []string {
+	if x != nil {
+		return x.Alternatives
+	}
+	return nil
+}
+
+func (x *MLDecisionPoint) GetRationale() string {
+	if x != nil {
+		return x.Rationale
+	}
+	return ""
+}
+
+// Formality indicators extracted by the LLM.
+type MLFormalityIndicators struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	OverallScore        float64                `protobuf:"fixed64,1,opt,name=overall_score,json=overallScore,proto3" json:"overall_score,omitempty"` // 0.0-1.0
+	HasTechnicalJargon  bool                   `protobuf:"varint,2,opt,name=has_technical_jargon,json=hasTechnicalJargon,proto3" json:"has_technical_jargon,omitempty"`
+	HasAcademicLanguage bool                   `protobuf:"varint,3,opt,name=has_academic_language,json=hasAcademicLanguage,proto3" json:"has_academic_language,omitempty"`
+	IsCasual            bool                   `protobuf:"varint,4,opt,name=is_casual,json=isCasual,proto3" json:"is_casual,omitempty"`
+	Register            string                 `protobuf:"bytes,5,opt,name=register,proto3" json:"register,omitempty"` // "formal", "neutral", "casual", "mixed"
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *MLFormalityIndicators) Reset() {
+	*x = MLFormalityIndicators{}
+	mi := &file_cerebro_v1_cerebro_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MLFormalityIndicators) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MLFormalityIndicators) ProtoMessage() {}
+
+func (x *MLFormalityIndicators) ProtoReflect() protoreflect.Message {
+	mi := &file_cerebro_v1_cerebro_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MLFormalityIndicators.ProtoReflect.Descriptor instead.
+func (*MLFormalityIndicators) Descriptor() ([]byte, []int) {
+	return file_cerebro_v1_cerebro_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *MLFormalityIndicators) GetOverallScore() float64 {
+	if x != nil {
+		return x.OverallScore
+	}
+	return 0
+}
+
+func (x *MLFormalityIndicators) GetHasTechnicalJargon() bool {
+	if x != nil {
+		return x.HasTechnicalJargon
+	}
+	return false
+}
+
+func (x *MLFormalityIndicators) GetHasAcademicLanguage() bool {
+	if x != nil {
+		return x.HasAcademicLanguage
+	}
+	return false
+}
+
+func (x *MLFormalityIndicators) GetIsCasual() bool {
+	if x != nil {
+		return x.IsCasual
+	}
+	return false
+}
+
+func (x *MLFormalityIndicators) GetRegister() string {
+	if x != nil {
+		return x.Register
+	}
+	return ""
+}
+
 // Final output of the CereBRO pipeline. Embeds a ReasoningReport for backward
 // compatibility — consumers that only understand ReasoningReport can extract
 // the base_report field directly.
@@ -1208,13 +1601,15 @@ type CerebroReport struct {
 	SalienceScores       []*SalienceScore     `protobuf:"bytes,10,rep,name=salience_scores,json=salienceScores,proto3" json:"salience_scores,omitempty"`                                                         // per-finding salience
 	Consolidated         bool                 `protobuf:"varint,11,opt,name=consolidated,proto3" json:"consolidated,omitempty"`                                                                                  // whether this run was indexed
 	ConsolidationTrigger ConsolidationTrigger `protobuf:"varint,12,opt,name=consolidation_trigger,json=consolidationTrigger,proto3,enum=cerebro.v1.ConsolidationTrigger" json:"consolidation_trigger,omitempty"` // what triggered consolidation
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// ML Enrichment
+	MlEnrichments []*MLEnrichment `protobuf:"bytes,13,rep,name=ml_enrichments,json=mlEnrichments,proto3" json:"ml_enrichments,omitempty"` // per-turn ML extractions (nil if ML disabled)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CerebroReport) Reset() {
 	*x = CerebroReport{}
-	mi := &file_cerebro_v1_cerebro_proto_msgTypes[11]
+	mi := &file_cerebro_v1_cerebro_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1226,7 +1621,7 @@ func (x *CerebroReport) String() string {
 func (*CerebroReport) ProtoMessage() {}
 
 func (x *CerebroReport) ProtoReflect() protoreflect.Message {
-	mi := &file_cerebro_v1_cerebro_proto_msgTypes[11]
+	mi := &file_cerebro_v1_cerebro_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1239,7 +1634,7 @@ func (x *CerebroReport) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CerebroReport.ProtoReflect.Descriptor instead.
 func (*CerebroReport) Descriptor() ([]byte, []int) {
-	return file_cerebro_v1_cerebro_proto_rawDescGZIP(), []int{11}
+	return file_cerebro_v1_cerebro_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *CerebroReport) GetBaseReport() *v1.ReasoningReport {
@@ -1324,6 +1719,13 @@ func (x *CerebroReport) GetConsolidationTrigger() ConsolidationTrigger {
 		return x.ConsolidationTrigger
 	}
 	return ConsolidationTrigger_CONSOLIDATION_TRIGGER_UNSPECIFIED
+}
+
+func (x *CerebroReport) GetMlEnrichments() []*MLEnrichment {
+	if x != nil {
+		return x.MlEnrichments
+	}
+	return nil
 }
 
 var File_cerebro_v1_cerebro_proto protoreflect.FileDescriptor
@@ -1429,7 +1831,40 @@ const file_cerebro_v1_cerebro_proto_rawDesc = "" +
 	"\x12outcome_confidence\x18\x0f \x01(\x01R\x11outcomeConfidence\x12)\n" +
 	"\x10detector_pattern\x18\x10 \x01(\tR\x0fdetectorPattern\x12'\n" +
 	"\x0fself_confidence\x18\x11 \x01(\x01R\x0eselfConfidence\x12)\n" +
-	"\x10feedback_applied\x18\x12 \x01(\bR\x0ffeedbackApplied\"\xe4\x05\n" +
+	"\x10feedback_applied\x18\x12 \x01(\bR\x0ffeedbackApplied\"\x8a\x03\n" +
+	"\fMLEnrichment\x12+\n" +
+	"\x06claims\x18\x01 \x03(\v2\x13.cerebro.v1.MLClaimR\x06claims\x12J\n" +
+	"\x14anchoring_references\x18\x02 \x03(\v2\x17.cerebro.v1.MLAnchorRefR\x13anchoringReferences\x12*\n" +
+	"\x11sunk_cost_phrases\x18\x03 \x03(\tR\x0fsunkCostPhrases\x12D\n" +
+	"\x0fdecision_points\x18\x04 \x03(\v2\x1b.cerebro.v1.MLDecisionPointR\x0edecisionPoints\x12?\n" +
+	"\tformality\x18\x05 \x01(\v2!.cerebro.v1.MLFormalityIndicatorsR\tformality\x12-\n" +
+	"\x12confidence_markers\x18\x06 \x03(\tR\x11confidenceMarkers\x12\x1f\n" +
+	"\vsource_turn\x18\a \x01(\rR\n" +
+	"sourceTurn\"\xa8\x01\n" +
+	"\aMLClaim\x12\x12\n" +
+	"\x04text\x18\x01 \x01(\tR\x04text\x12\x18\n" +
+	"\aspeaker\x18\x02 \x01(\tR\aspeaker\x12\x1f\n" +
+	"\vsource_turn\x18\x03 \x01(\rR\n" +
+	"sourceTurn\x12)\n" +
+	"\x10epistemic_status\x18\x04 \x01(\tR\x0fepistemicStatus\x12#\n" +
+	"\revidence_refs\x18\x05 \x03(\tR\fevidenceRefs\"o\n" +
+	"\vMLAnchorRef\x12\x14\n" +
+	"\x05value\x18\x01 \x01(\x01R\x05value\x12\x12\n" +
+	"\x04turn\x18\x02 \x01(\rR\x04turn\x12\x18\n" +
+	"\acontext\x18\x03 \x01(\tR\acontext\x12\x1c\n" +
+	"\trelevance\x18\x04 \x01(\x01R\trelevance\"\xae\x01\n" +
+	"\x0fMLDecisionPoint\x12\x12\n" +
+	"\x04turn\x18\x01 \x01(\rR\x04turn\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x12#\n" +
+	"\rchosen_option\x18\x03 \x01(\tR\fchosenOption\x12\"\n" +
+	"\falternatives\x18\x04 \x03(\tR\falternatives\x12\x1c\n" +
+	"\trationale\x18\x05 \x01(\tR\trationale\"\xdb\x01\n" +
+	"\x15MLFormalityIndicators\x12#\n" +
+	"\roverall_score\x18\x01 \x01(\x01R\foverallScore\x120\n" +
+	"\x14has_technical_jargon\x18\x02 \x01(\bR\x12hasTechnicalJargon\x122\n" +
+	"\x15has_academic_language\x18\x03 \x01(\bR\x13hasAcademicLanguage\x12\x1b\n" +
+	"\tis_casual\x18\x04 \x01(\bR\bisCasual\x12\x1a\n" +
+	"\bregister\x18\x05 \x01(\tR\bregister\"\xa5\x06\n" +
 	"\rCerebroReport\x12B\n" +
 	"\vbase_report\x18\x01 \x01(\v2!.cog.reasoning.v1.ReasoningReportR\n" +
 	"baseReport\x12E\n" +
@@ -1447,7 +1882,8 @@ const file_cerebro_v1_cerebro_proto_rawDesc = "" +
 	"\x0fsalience_scores\x18\n" +
 	" \x03(\v2\x19.cerebro.v1.SalienceScoreR\x0esalienceScores\x12\"\n" +
 	"\fconsolidated\x18\v \x01(\bR\fconsolidated\x12U\n" +
-	"\x15consolidation_trigger\x18\f \x01(\x0e2 .cerebro.v1.ConsolidationTriggerR\x14consolidationTrigger*V\n" +
+	"\x15consolidation_trigger\x18\f \x01(\x0e2 .cerebro.v1.ConsolidationTriggerR\x14consolidationTrigger\x12?\n" +
+	"\x0eml_enrichments\x18\r \x03(\v2\x18.cerebro.v1.MLEnrichmentR\rmlEnrichments*V\n" +
 	"\x10InhibitionAction\x12!\n" +
 	"\x1dINHIBITION_ACTION_UNSPECIFIED\x10\x00\x12\r\n" +
 	"\tINHIBITED\x10\x01\x12\x10\n" +
@@ -1482,7 +1918,7 @@ func file_cerebro_v1_cerebro_proto_rawDescGZIP() []byte {
 }
 
 var file_cerebro_v1_cerebro_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_cerebro_v1_cerebro_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_cerebro_v1_cerebro_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_cerebro_v1_cerebro_proto_goTypes = []any{
 	(InhibitionAction)(0),           // 0: cerebro.v1.InhibitionAction
 	(GainMode)(0),                   // 1: cerebro.v1.GainMode
@@ -1499,39 +1935,49 @@ var file_cerebro_v1_cerebro_proto_goTypes = []any{
 	(*FeedbackRequest)(nil),         // 12: cerebro.v1.FeedbackRequest
 	(*FeedbackResponse)(nil),        // 13: cerebro.v1.FeedbackResponse
 	(*ConsolidationEntry)(nil),      // 14: cerebro.v1.ConsolidationEntry
-	(*CerebroReport)(nil),           // 15: cerebro.v1.CerebroReport
-	nil,                             // 16: cerebro.v1.ThresholdAdjustments.AdjustmentsEntry
-	(v1.FindingType)(0),             // 17: cog.reasoning.v1.FindingType
-	(*v1.ReasoningReport)(nil),      // 18: cog.reasoning.v1.ReasoningReport
-	(*v1.ConversationSnapshot)(nil), // 19: cog.reasoning.v1.ConversationSnapshot
-	(*v1.CognitiveAssessment)(nil),  // 20: cog.reasoning.v1.CognitiveAssessment
-	(*timestamppb.Timestamp)(nil),   // 21: google.protobuf.Timestamp
+	(*MLEnrichment)(nil),            // 15: cerebro.v1.MLEnrichment
+	(*MLClaim)(nil),                 // 16: cerebro.v1.MLClaim
+	(*MLAnchorRef)(nil),             // 17: cerebro.v1.MLAnchorRef
+	(*MLDecisionPoint)(nil),         // 18: cerebro.v1.MLDecisionPoint
+	(*MLFormalityIndicators)(nil),   // 19: cerebro.v1.MLFormalityIndicators
+	(*CerebroReport)(nil),           // 20: cerebro.v1.CerebroReport
+	nil,                             // 21: cerebro.v1.ThresholdAdjustments.AdjustmentsEntry
+	(v1.FindingType)(0),             // 22: cog.reasoning.v1.FindingType
+	(*v1.ReasoningReport)(nil),      // 23: cog.reasoning.v1.ReasoningReport
+	(*v1.ConversationSnapshot)(nil), // 24: cog.reasoning.v1.ConversationSnapshot
+	(*v1.CognitiveAssessment)(nil),  // 25: cog.reasoning.v1.CognitiveAssessment
+	(*timestamppb.Timestamp)(nil),   // 26: google.protobuf.Timestamp
 }
 var file_cerebro_v1_cerebro_proto_depIdxs = []int32{
 	1,  // 0: cerebro.v1.GainSignal.mode:type_name -> cerebro.v1.GainMode
-	16, // 1: cerebro.v1.ThresholdAdjustments.adjustments:type_name -> cerebro.v1.ThresholdAdjustments.AdjustmentsEntry
+	21, // 1: cerebro.v1.ThresholdAdjustments.adjustments:type_name -> cerebro.v1.ThresholdAdjustments.AdjustmentsEntry
 	1,  // 2: cerebro.v1.ThresholdAdjustments.source_mode:type_name -> cerebro.v1.GainMode
 	0,  // 3: cerebro.v1.InhibitionDecision.action:type_name -> cerebro.v1.InhibitionAction
-	17, // 4: cerebro.v1.InhibitionDecision.finding_type:type_name -> cog.reasoning.v1.FindingType
+	22, // 4: cerebro.v1.InhibitionDecision.finding_type:type_name -> cog.reasoning.v1.FindingType
 	2,  // 5: cerebro.v1.SelfConfidenceReport.recommendation:type_name -> cerebro.v1.ConfidenceRecommendation
-	18, // 6: cerebro.v1.FeedbackRequest.original_report:type_name -> cog.reasoning.v1.ReasoningReport
-	19, // 7: cerebro.v1.FeedbackRequest.context:type_name -> cog.reasoning.v1.ConversationSnapshot
-	20, // 8: cerebro.v1.FeedbackResponse.updated:type_name -> cog.reasoning.v1.CognitiveAssessment
-	21, // 9: cerebro.v1.ConsolidationEntry.timestamp:type_name -> google.protobuf.Timestamp
+	23, // 6: cerebro.v1.FeedbackRequest.original_report:type_name -> cog.reasoning.v1.ReasoningReport
+	24, // 7: cerebro.v1.FeedbackRequest.context:type_name -> cog.reasoning.v1.ConversationSnapshot
+	25, // 8: cerebro.v1.FeedbackResponse.updated:type_name -> cog.reasoning.v1.CognitiveAssessment
+	26, // 9: cerebro.v1.ConsolidationEntry.timestamp:type_name -> google.protobuf.Timestamp
 	3,  // 10: cerebro.v1.ConsolidationEntry.trigger:type_name -> cerebro.v1.ConsolidationTrigger
-	18, // 11: cerebro.v1.CerebroReport.base_report:type_name -> cog.reasoning.v1.ReasoningReport
-	9,  // 12: cerebro.v1.CerebroReport.inhibition_log:type_name -> cerebro.v1.InhibitionDecision
-	21, // 13: cerebro.v1.CerebroReport.assessed_at:type_name -> google.protobuf.Timestamp
-	7,  // 14: cerebro.v1.CerebroReport.gain_signal:type_name -> cerebro.v1.GainSignal
-	8,  // 15: cerebro.v1.CerebroReport.threshold_adjustments:type_name -> cerebro.v1.ThresholdAdjustments
-	11, // 16: cerebro.v1.CerebroReport.self_confidence:type_name -> cerebro.v1.SelfConfidenceReport
-	10, // 17: cerebro.v1.CerebroReport.salience_scores:type_name -> cerebro.v1.SalienceScore
-	3,  // 18: cerebro.v1.CerebroReport.consolidation_trigger:type_name -> cerebro.v1.ConsolidationTrigger
-	19, // [19:19] is the sub-list for method output_type
-	19, // [19:19] is the sub-list for method input_type
-	19, // [19:19] is the sub-list for extension type_name
-	19, // [19:19] is the sub-list for extension extendee
-	0,  // [0:19] is the sub-list for field type_name
+	16, // 11: cerebro.v1.MLEnrichment.claims:type_name -> cerebro.v1.MLClaim
+	17, // 12: cerebro.v1.MLEnrichment.anchoring_references:type_name -> cerebro.v1.MLAnchorRef
+	18, // 13: cerebro.v1.MLEnrichment.decision_points:type_name -> cerebro.v1.MLDecisionPoint
+	19, // 14: cerebro.v1.MLEnrichment.formality:type_name -> cerebro.v1.MLFormalityIndicators
+	23, // 15: cerebro.v1.CerebroReport.base_report:type_name -> cog.reasoning.v1.ReasoningReport
+	9,  // 16: cerebro.v1.CerebroReport.inhibition_log:type_name -> cerebro.v1.InhibitionDecision
+	26, // 17: cerebro.v1.CerebroReport.assessed_at:type_name -> google.protobuf.Timestamp
+	7,  // 18: cerebro.v1.CerebroReport.gain_signal:type_name -> cerebro.v1.GainSignal
+	8,  // 19: cerebro.v1.CerebroReport.threshold_adjustments:type_name -> cerebro.v1.ThresholdAdjustments
+	11, // 20: cerebro.v1.CerebroReport.self_confidence:type_name -> cerebro.v1.SelfConfidenceReport
+	10, // 21: cerebro.v1.CerebroReport.salience_scores:type_name -> cerebro.v1.SalienceScore
+	3,  // 22: cerebro.v1.CerebroReport.consolidation_trigger:type_name -> cerebro.v1.ConsolidationTrigger
+	15, // 23: cerebro.v1.CerebroReport.ml_enrichments:type_name -> cerebro.v1.MLEnrichment
+	24, // [24:24] is the sub-list for method output_type
+	24, // [24:24] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_cerebro_v1_cerebro_proto_init() }
@@ -1545,7 +1991,7 @@ func file_cerebro_v1_cerebro_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_cerebro_v1_cerebro_proto_rawDesc), len(file_cerebro_v1_cerebro_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   13,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

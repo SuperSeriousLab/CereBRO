@@ -1,6 +1,8 @@
 package pipeline
 
 import (
+	"net/http"
+
 	cerebrov1 "github.com/SuperSeriousLab/CereBRO/gen/go/cerebro/v1"
 	reasoningv1 "github.com/SuperSeriousLab/CereBRO/gen/go/cog/reasoning/v1"
 )
@@ -29,6 +31,9 @@ type PipelineConfig struct {
 	Salience            SalienceConfig       // Phase 5: Salience Filter
 	UseSalience         bool                 // if true, run Salience Filter after Inhibitor
 	Consolidator        *Consolidator        // Phase 5: Memory Consolidator (nil = disabled)
+	MLEnricher          MLEnricherConfig     // ML Enricher configuration (Ollama)
+	MLClient            *http.Client         // HTTP client for ML enricher (nil = use default)
+	MLEnrichment        *cerebrov1.MLEnrichment // populated at runtime by Stage 1.3 (merged view)
 }
 
 // DefaultPipelineConfig returns all-default detector configurations.
@@ -65,6 +70,7 @@ type PipelineResult struct {
 	Salience     *SalienceResult                 // nil if salience not enabled
 	Consolidated bool                            // true if memory consolidation occurred
 	ConsolidationTrigger cerebrov1.ConsolidationTrigger // what triggered consolidation
+	MLEnrichments []*cerebrov1.MLEnrichment       // nil if ML enricher not enabled
 }
 
 // Run executes the full cognitive pipeline on a ConversationSnapshot:
@@ -96,12 +102,27 @@ func Run(snap *reasoningv1.ConversationSnapshot, cfg PipelineConfig) *PipelineRe
 	// Stage 1: Intake enrichment
 	snap = Enrich(snap)
 
+	// Stage 1.3: ML Enrichment (if enabled)
+	var mlEnrichments []*cerebrov1.MLEnrichment
+	if cfg.MLEnricher.Enabled {
+		client := cfg.MLClient
+		if client == nil {
+			client = http.DefaultClient
+		}
+		mlEnrichments = EnrichML(snap, cfg.MLEnricher, client)
+		cfg.MLEnrichment = MergeMLEnrichments(mlEnrichments)
+	}
+
 	// Stage 1.5: Urgency Assessment (Phase 2)
 	var gain *GainSignal
 	var adjustments *ThresholdAdjustments
 
 	if cfg.UseNeuromodulation {
-		gain = AssessUrgency(snap, cfg.Urgency)
+		if cfg.MLEnrichment != nil {
+			gain = AssessUrgencyML(snap, cfg.Urgency, cfg.MLEnrichment)
+		} else {
+			gain = AssessUrgency(snap, cfg.Urgency)
+		}
 
 		// Stage 2.5 (computed early so we can apply offsets to detectors)
 		adjustments = Modulate(gain, cfg.Modulator)
@@ -188,15 +209,16 @@ func Run(snap *reasoningv1.ConversationSnapshot, cfg PipelineConfig) *PipelineRe
 	}
 
 	result := &PipelineResult{
-		Report:      report,
-		Routing:     routing,
-		Findings:    findings, // all raw findings (pre-inhibition)
-		Inhibition:  inhibition,
-		Gain:        gain,
-		Adjustments: adjustments,
-		SelfConf:    selfConf,
-		Feedback:    feedbackResult,
-		Salience:    salienceResult,
+		Report:        report,
+		Routing:       routing,
+		Findings:      findings, // all raw findings (pre-inhibition)
+		Inhibition:    inhibition,
+		Gain:          gain,
+		Adjustments:   adjustments,
+		SelfConf:      selfConf,
+		Feedback:      feedbackResult,
+		Salience:      salienceResult,
+		MLEnrichments: mlEnrichments,
 	}
 
 	// Stage 8: Memory Consolidator (Phase 5)
@@ -275,9 +297,15 @@ type DetectorFunc func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.Cogn
 
 // buildDetectorMap creates a uniform map of detector names to functions.
 // Config is captured by closure so all detectors share the same signature.
+// When cfg.MLEnrichment is non-nil, ML-enhanced variants are used.
 func buildDetectorMap(cfg PipelineConfig) map[Detector]DetectorFunc {
+	ml := cfg.MLEnrichment // captured by closures; nil when ML disabled
+
 	m := map[Detector]DetectorFunc{
 		DetectorSunkCost: func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
+			if ml != nil {
+				return DetectSunkCostML(snap, cfg.SunkCost, ml)
+			}
 			return DetectSunkCost(snap, cfg.SunkCost)
 		},
 		DetectorContradiction: func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
@@ -287,6 +315,9 @@ func buildDetectorMap(cfg PipelineConfig) map[Detector]DetectorFunc {
 			return DetectScopeDrift(snap, cfg.ScopeGuard)
 		},
 		DetectorCalibrator: func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
+			if ml != nil {
+				return DetectConfidenceMiscalibrationML(snap, cfg.Calibrator, ml)
+			}
 			return DetectConfidenceMiscalibration(snap, cfg.Calibrator)
 		},
 		DetectorLedger: func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
@@ -295,6 +326,9 @@ func buildDetectorMap(cfg PipelineConfig) map[Detector]DetectorFunc {
 	}
 	if cfg.UseContextAnchoring {
 		m[DetectorAnchoring] = func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
+			if ml != nil {
+				return DetectAnchoringContextML(snap, cfg.AnchoringContext, ml)
+			}
 			return DetectAnchoringContext(snap, cfg.AnchoringContext)
 		}
 	} else {
@@ -363,6 +397,7 @@ func (r *PipelineResult) ToCerebroReport() *cerebrov1.CerebroReport {
 	}
 	cr.Consolidated = r.Consolidated
 	cr.ConsolidationTrigger = r.ConsolidationTrigger
+	cr.MlEnrichments = r.MLEnrichments
 
 	return cr
 }

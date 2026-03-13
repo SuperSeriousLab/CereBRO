@@ -8,6 +8,39 @@ import (
 	"github.com/SuperSeriousLab/CereBRO/internal/textutil"
 )
 
+// AssessUrgencyML produces a GainSignal using ML formality indicators when available.
+// Falls back to PURE formality if ML is nil.
+func AssessUrgencyML(snap *reasoningv1.ConversationSnapshot, cfg UrgencyConfig, ml *cerebrov1.MLEnrichment) *GainSignal {
+	if snap == nil {
+		return &GainSignal{Urgency: 0.5, Complexity: 0.5, Formality: 0.5, Mode: cerebrov1.GainMode_TONIC}
+	}
+
+	urgency := computeUrgency(snap, cfg)
+	complexity := computeComplexity(snap, cfg)
+
+	// Use ML formality if available, PURE as fallback
+	formality := ComputeFormality(snap)
+	if ml != nil && ml.GetFormality() != nil {
+		mlFormality := ml.GetFormality().GetOverallScore()
+		if mlFormality > 0 {
+			// Blend ML and PURE formality (ML weighted higher)
+			formality = 0.7*mlFormality + 0.3*formality
+		}
+	}
+
+	mode := cerebrov1.GainMode_TONIC
+	if urgency > cfg.PhasicUrgencyThreshold {
+		mode = cerebrov1.GainMode_PHASIC
+	}
+
+	return &GainSignal{
+		Urgency:    urgency,
+		Complexity: complexity,
+		Formality:  formality,
+		Mode:       mode,
+	}
+}
+
 // UrgencyConfig holds the Urgency Assessor's tunable parameters.
 type UrgencyConfig struct {
 	UrgencyKeywords          []string

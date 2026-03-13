@@ -5,8 +5,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/SuperSeriousLab/CereBRO/internal/textutil"
+	cerebrov1 "github.com/SuperSeriousLab/CereBRO/gen/go/cerebro/v1"
 	reasoningv1 "github.com/SuperSeriousLab/CereBRO/gen/go/cog/reasoning/v1"
+	"github.com/SuperSeriousLab/CereBRO/internal/textutil"
 )
 
 // ============================================================
@@ -133,6 +134,28 @@ var continuationPhrases = []string{
 type phraseMatch struct {
 	phrase string
 	turn   uint32
+}
+
+// DetectSunkCostML wraps DetectSunkCost with optional ML enrichment.
+// If ML found sunk_cost_phrases, boost confidence of PURE findings.
+func DetectSunkCostML(snap *reasoningv1.ConversationSnapshot, cfg SunkCostConfig, ml *cerebrov1.MLEnrichment) *reasoningv1.CognitiveAssessment {
+	finding := DetectSunkCost(snap, cfg)
+	if ml == nil || len(ml.GetSunkCostPhrases()) == 0 {
+		return finding
+	}
+	if finding != nil {
+		// ML corroborates — boost confidence
+		finding.Confidence = clamp(finding.Confidence+0.1, 0.0, 1.0)
+		return finding
+	}
+	// ML found phrases but PURE didn't — produce a low-confidence finding
+	return &reasoningv1.CognitiveAssessment{
+		FindingType:  reasoningv1.FindingType_SUNK_COST_FALLACY,
+		Severity:     reasoningv1.FindingSeverity_INFO,
+		Explanation:  "ML enricher identified sunk-cost language not caught by phrase matching",
+		Confidence:   0.4,
+		DetectorName: "sunk-cost-detector",
+	}
 }
 
 func DetectSunkCost(snap *reasoningv1.ConversationSnapshot, cfg SunkCostConfig) *reasoningv1.CognitiveAssessment {
@@ -684,6 +707,43 @@ var confidenceKeywords = []struct {
 var evidenceMarkers = []string{
 	"because", "since", "evidence shows", "data indicates",
 	"according to", "studies show",
+}
+
+// DetectConfidenceMiscalibrationML wraps DetectConfidenceMiscalibration with ML enrichment.
+// Uses ML confidence_markers and claim epistemic mismatches to refine detection.
+func DetectConfidenceMiscalibrationML(snap *reasoningv1.ConversationSnapshot, cfg CalibratorConfig, ml *cerebrov1.MLEnrichment) *reasoningv1.CognitiveAssessment {
+	finding := DetectConfidenceMiscalibration(snap, cfg)
+	if ml == nil {
+		return finding
+	}
+
+	// Check ML claims for epistemic mismatches (e.g., "certain" claim with no evidence)
+	var mlMismatch bool
+	for _, claim := range ml.GetClaims() {
+		hasEvidence := len(claim.GetEvidenceRefs()) > 0
+		if claim.GetEpistemicStatus() == "certain" && !hasEvidence {
+			mlMismatch = true
+			break
+		}
+	}
+
+	if finding != nil && mlMismatch {
+		// ML corroborates — boost confidence
+		finding.Confidence = clamp(finding.Confidence+0.1, 0.0, 1.0)
+	}
+
+	// ML confidence markers can trigger if PURE missed
+	if finding == nil && mlMismatch && len(ml.GetConfidenceMarkers()) > 0 {
+		return &reasoningv1.CognitiveAssessment{
+			FindingType:  reasoningv1.FindingType_CONFIDENCE_MISCALIBRATION,
+			Severity:     reasoningv1.FindingSeverity_INFO,
+			Explanation:  "ML enricher identified confidence-evidence mismatch in claims",
+			Confidence:   0.4,
+			DetectorName: "confidence-calibrator",
+		}
+	}
+
+	return finding
 }
 
 func DetectConfidenceMiscalibration(snap *reasoningv1.ConversationSnapshot, cfg CalibratorConfig) *reasoningv1.CognitiveAssessment {

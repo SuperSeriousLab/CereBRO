@@ -210,6 +210,57 @@ message ConsolidationEntry {
 
 
 // =============================================================================
+// ML Enrichment (Ollama-powered structured extraction)
+// =============================================================================
+
+// Structured extraction from a single conversation turn via local LLM.
+message MLEnrichment {
+  repeated MLClaim claims = 1;
+  repeated MLAnchorRef anchoring_references = 2;
+  repeated string sunk_cost_phrases = 3;
+  repeated MLDecisionPoint decision_points = 4;
+  MLFormalityIndicators formality = 5;
+  repeated string confidence_markers = 6;
+  uint32 source_turn = 7;        // which turn this enrichment covers
+}
+
+// A claim extracted by the LLM with epistemic metadata.
+message MLClaim {
+  string text = 1;
+  string speaker = 2;
+  uint32 source_turn = 3;
+  string epistemic_status = 4;   // "certain", "likely", "speculative", etc.
+  repeated string evidence_refs = 5;
+}
+
+// A numeric reference identified by the LLM as potentially anchoring.
+message MLAnchorRef {
+  double value = 1;
+  uint32 turn = 2;
+  string context = 3;
+  double relevance = 4;          // 0.0-1.0, how relevant to the discussion
+}
+
+// A decision point identified by the LLM.
+message MLDecisionPoint {
+  uint32 turn = 1;
+  string description = 2;
+  string chosen_option = 3;
+  repeated string alternatives = 4;
+  string rationale = 5;
+}
+
+// Formality indicators extracted by the LLM.
+message MLFormalityIndicators {
+  double overall_score = 1;       // 0.0-1.0
+  bool has_technical_jargon = 2;
+  bool has_academic_language = 3;
+  bool is_casual = 4;
+  string register = 5;           // "formal", "neutral", "casual", "mixed"
+}
+
+
+// =============================================================================
 // Top-level output
 // =============================================================================
 
@@ -239,4 +290,7 @@ message CerebroReport {
   repeated SalienceScore salience_scores = 10;   // per-finding salience
   bool consolidated = 11;                         // whether this run was indexed
   ConsolidationTrigger consolidation_trigger = 12; // what triggered consolidation
+
+  // ML Enrichment
+  repeated MLEnrichment ml_enrichments = 13;      // per-turn ML extractions (nil if ML disabled)
 }

@@ -137,6 +137,26 @@ func PreCortexInfo() VariantInfo {
 	}
 }
 
+// MLEnrichedConfig returns Variant F: full pipeline with ML enrichment enabled.
+// Same as Variant A but with Ollama-based ML enrichment at Stage 1.3.
+// Stages: 0 → 1 → 1.3 → 1.5 → 2 → 2.5 → 3 → 4 → 4.5 → 5 → 6 → 7 → 8
+func MLEnrichedConfig() PipelineConfig {
+	cfg := FullCortexConfig()
+	cfg.MLEnricher = DefaultMLEnricherConfig()
+	cfg.MLEnricher.Enabled = true
+	return cfg
+}
+
+// MLEnrichedInfo returns metadata for Variant F.
+func MLEnrichedInfo() VariantInfo {
+	return VariantInfo{
+		Name:        "F-ml-enriched",
+		Description: "Full pipeline with Ollama ML enrichment at Stage 1.3",
+		StageCount:  13, // 0,1,1.3,1.5,2,2.5,3,4,4.5,5,6,7,8
+		CogCount:    22,
+	}
+}
+
 // ArchVariant bundles a config with its metadata.
 type ArchVariant struct {
 	Config PipelineConfig
@@ -144,6 +164,7 @@ type ArchVariant struct {
 }
 
 // AllVariants returns all architecture variant configs and metadata in order A-E.
+// Variant F (ML-enriched) is excluded — it requires Ollama and is tested separately.
 func AllVariants() []ArchVariant {
 	return []ArchVariant{
 		{FullCortexConfig(), FullCortexInfo()},
@@ -152,4 +173,10 @@ func AllVariants() []ArchVariant {
 		{InhibitorOnlyConfig(), InhibitorOnlyInfo()},
 		{PreCortexConfig(), PreCortexInfo()},
 	}
+}
+
+// AllVariantsWithML returns all variants including F (ML-enriched).
+// Use only when Ollama is available.
+func AllVariantsWithML() []ArchVariant {
+	return append(AllVariants(), ArchVariant{MLEnrichedConfig(), MLEnrichedInfo()})
 }
