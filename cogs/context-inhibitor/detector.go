@@ -2,7 +2,7 @@
 //
 // PURE deterministic — no LLM calls. Implements basal ganglia inhibitory
 // gating: default-suppresses all findings, selectively disinhibits through
-// 5 gates. CORTEX Phase 1, Layer 3 (Inhibition).
+// 5 gates. Phase 1, Layer 3 (Inhibition).
 //
 // Gate ordering:
 //  1. Casual hedge suppression (CONFIDENCE_MISCALIBRATION + informal + hedge word)

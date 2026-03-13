@@ -3,7 +3,7 @@
 // PURE deterministic — no LLM calls. Assesses system confidence in its own
 // findings by computing agreement, margin, and historical scores into an
 // overall self-confidence report.
-// CORTEX Phase 2, Layer 4 (Self-Assessment).
+// Phase 2, Layer 4 (Self-Assessment).
 //
 // The implementation delegates to internal/pipeline.AssessConfidence().
 package main

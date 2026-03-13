@@ -1,6 +1,6 @@
 # Language Detector COG manifest.
 # PURE deterministic — trigram frequency language detection.
-# CORTEX Phase 3 — Layer 0 (Brainstem Reflexes).
+# Phase 3 — Layer 0 (Brainstem Reflexes).
 
 name: "language-detector"
 version: "0.1.0"
@@ -16,7 +16,7 @@ ports {
 ports {
   name: "language_result"
   direction: OUT
-  message_type: "cortex.v1.LanguageResult"
+  message_type: "cerebro.v1.LanguageResult"
 }
 
 ports {
@@ -27,7 +27,7 @@ ports {
 
 contracts {
   packages: "cog.reasoning.v1"
-  packages: "cortex.v1"
+  packages: "cerebro.v1"
   packages: "cog.core.v1"
   proto_hash: "sha256:pending"
 }
@@ -74,7 +74,7 @@ config {
 description: "Trigram frequency language detection (Cavnar & Trenkle 1994) — detects dominant language from conversation text"
 
 tags: "cognitive"
-tags: "cortex"
+tags: "cerebro"
 tags: "layer0"
 tags: "pure"
 

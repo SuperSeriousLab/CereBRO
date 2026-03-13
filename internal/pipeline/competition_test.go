@@ -2,7 +2,6 @@ package pipeline
 
 import (
 	"encoding/json"
-	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -113,9 +112,6 @@ func loadTestConversations(t *testing.T) []testConversation {
 	if len(files) == 0 {
 		t.Skip("no test conversations found")
 	}
-
-	cfg := DefaultPipelineConfig()
-	_ = cfg
 
 	var convs []testConversation
 	for _, f := range files {
@@ -364,7 +360,6 @@ func TestFullPipelineComparison(t *testing.T) {
 				t.Errorf("F1 %.2f below minimum threshold 0.60", f1)
 			}
 
-			_ = fmt.Sprintf("done")
 		})
 	}
 }
@@ -406,7 +401,7 @@ func TestVariantFactories(t *testing.T) {
 	}
 }
 
-// TestPreCortexBaseline verifies Variant E reproduces pre-CORTEX metrics.
+// TestPreCortexBaseline verifies Variant E reproduces pre-pipeline metrics.
 func TestPreCortexBaseline(t *testing.T) {
 	convDir := filepath.Join("..", "..", "data", "test-conversations")
 	if _, err := os.Stat(convDir); os.IsNotExist(err) {
@@ -428,14 +423,14 @@ func TestPreCortexBaseline(t *testing.T) {
 	recall := float64(totalTP) / float64(totalTP+totalFN)
 	f1 := 2 * precision * recall / (precision + recall)
 
-	t.Logf("Pre-CORTEX: TP=%d FP=%d FN=%d Precision=%.2f Recall=%.2f F1=%.2f",
+	t.Logf("Pre-pipeline: TP=%d FP=%d FN=%d Precision=%.2f Recall=%.2f F1=%.2f",
 		totalTP, totalFP, totalFN, precision, recall, f1)
 
 	if recall < 0.99 {
 		t.Errorf("expected recall=1.00, got %.2f", recall)
 	}
 	if totalFP != 5 {
-		t.Errorf("expected 5 FP (pre-CORTEX baseline), got %d", totalFP)
+		t.Errorf("expected 5 FP (pre-pipeline baseline), got %d", totalFP)
 	}
 }
 
@@ -475,7 +470,7 @@ func TestFullCortexNoRegression(t *testing.T) {
 	recall := float64(totalTP) / float64(totalTP+totalFN)
 	f1 := 2 * precision * recall / (precision + recall)
 
-	t.Logf("Full-CORTEX: TP=%d FP=%d FN=%d Precision=%.2f Recall=%.2f F1=%.2f",
+	t.Logf("Full-pipeline: TP=%d FP=%d FN=%d Precision=%.2f Recall=%.2f F1=%.2f",
 		totalTP, totalFP, totalFN, precision, recall, f1)
 
 	if recall < 0.99 {
@@ -621,7 +616,7 @@ func TestArchitectureCompetition(t *testing.T) {
 		t.Errorf("Variant A FP=%.0f (expected 2)", aTraits["false_positives"])
 	}
 
-	// Variant E must match pre-CORTEX baseline.
+	// Variant E must match pre-pipeline baseline.
 	eTraits := variantTraits["E-pre-cortex"]
 	if eTraits["false_positives"] != 5 {
 		t.Errorf("Variant E FP=%.0f (expected 5)", eTraits["false_positives"])

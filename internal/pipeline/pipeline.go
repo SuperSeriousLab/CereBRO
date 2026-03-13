@@ -16,19 +16,19 @@ type PipelineConfig struct {
 	ScopeGuard          ScopeGuardConfig
 	Calibrator          CalibratorConfig
 	Ledger              LedgerConfig
-	Inhibitor           InhibitorConfig // CORTEX Phase 1: Context Inhibitor
+	Inhibitor           InhibitorConfig // Phase 1: Context Inhibitor
 	UseInhibitor        bool            // if true, run Context Inhibitor before Aggregator
-	Urgency             UrgencyConfig   // CORTEX Phase 2: Urgency Assessor
-	Modulator           ModulatorConfig // CORTEX Phase 2: Threshold Modulator
+	Urgency             UrgencyConfig   // Phase 2: Urgency Assessor
+	Modulator           ModulatorConfig // Phase 2: Threshold Modulator
 	UseNeuromodulation  bool            // if true, run Urgency Assessor + Threshold Modulator
-	Layer0              Layer0Config    // CORTEX Phase 3: Layer 0 reflexes
+	Layer0              Layer0Config    // Phase 3: Layer 0 reflexes
 	UseLayer0           bool            // if true, run Layer 0 before Stage 1
-	SelfConfidence      SelfConfidenceConfig // CORTEX Phase 4: Self-Confidence Assessor
-	Feedback            FeedbackConfig       // CORTEX Phase 4: Feedback Evaluator
+	SelfConfidence      SelfConfidenceConfig // Phase 4: Self-Confidence Assessor
+	Feedback            FeedbackConfig       // Phase 4: Feedback Evaluator
 	UseMetacognition    bool                 // if true, run Self-Confidence + Feedback
-	Salience            SalienceConfig       // CORTEX Phase 5: Salience Filter
+	Salience            SalienceConfig       // Phase 5: Salience Filter
 	UseSalience         bool                 // if true, run Salience Filter after Inhibitor
-	Consolidator        *Consolidator        // CORTEX Phase 5: Memory Consolidator (nil = disabled)
+	Consolidator        *Consolidator        // Phase 5: Memory Consolidator (nil = disabled)
 }
 
 // DefaultPipelineConfig returns all-default detector configurations.
@@ -82,7 +82,7 @@ type PipelineResult struct {
 //	Stage 7:   Feedback Evaluator (bounded re-evaluation loop) — Phase 4
 //	Stage 8:   Memory Consolidator (sparse indexing → corpus) — Phase 5
 func Run(snap *reasoningv1.ConversationSnapshot, cfg PipelineConfig) *PipelineResult {
-	// Stage 0: Layer 0 Reflexes (CORTEX Phase 3)
+	// Stage 0: Layer 0 Reflexes (Phase 3)
 	if cfg.UseLayer0 {
 		l0 := RunLayer0(snap, cfg.Layer0)
 		if !l0.Accepted {
@@ -96,7 +96,7 @@ func Run(snap *reasoningv1.ConversationSnapshot, cfg PipelineConfig) *PipelineRe
 	// Stage 1: Intake enrichment
 	snap = Enrich(snap)
 
-	// Stage 1.5: Urgency Assessment (CORTEX Phase 2)
+	// Stage 1.5: Urgency Assessment (Phase 2)
 	var gain *GainSignal
 	var adjustments *ThresholdAdjustments
 
@@ -126,7 +126,7 @@ func Run(snap *reasoningv1.ConversationSnapshot, cfg PipelineConfig) *PipelineRe
 		}
 	}
 
-	// Stage 4: Context Inhibitor (CORTEX Phase 1)
+	// Stage 4: Context Inhibitor (Phase 1)
 	var inhibition *InhibitorResult
 	aggregateFindings := findings
 
@@ -141,7 +141,7 @@ func Run(snap *reasoningv1.ConversationSnapshot, cfg PipelineConfig) *PipelineRe
 		aggregateFindings = inhibition.Gated // Only disinhibited findings pass
 	}
 
-	// Stage 4.5: Salience Filter (CORTEX Phase 5)
+	// Stage 4.5: Salience Filter (Phase 5)
 	var salienceResult *SalienceResult
 	if cfg.UseSalience {
 		salienceResult = FilterSalience(aggregateFindings, cfg.Salience)
@@ -151,14 +151,14 @@ func Run(snap *reasoningv1.ConversationSnapshot, cfg PipelineConfig) *PipelineRe
 	// Stage 5: Aggregate
 	report := Aggregate(aggregateFindings, snap.GetObjective())
 
-	// Stage 6: Self-Confidence Assessor (CORTEX Phase 4)
+	// Stage 6: Self-Confidence Assessor (Phase 4)
 	var selfConf *cerebrov1.SelfConfidenceReport
 	var feedbackResult *FeedbackResult
 
 	if cfg.UseMetacognition {
 		selfConf = AssessConfidence(report, cfg.SelfConfidence)
 
-		// Stage 7: Feedback Evaluator (CORTEX Phase 4)
+		// Stage 7: Feedback Evaluator (Phase 4)
 		// If confidence is low, re-evaluate weakest findings with peer context.
 		updatedFindings, fbResult := EvaluateFeedback(
 			aggregateFindings, selfConf, snap, report, cfg.Feedback, detectors,
@@ -199,7 +199,7 @@ func Run(snap *reasoningv1.ConversationSnapshot, cfg PipelineConfig) *PipelineRe
 		Salience:    salienceResult,
 	}
 
-	// Stage 8: Memory Consolidator (CORTEX Phase 5)
+	// Stage 8: Memory Consolidator (Phase 5)
 	// Synchronous — just a JSON marshal + file append.
 	if cfg.Consolidator != nil {
 		fbApplied := feedbackResult != nil && feedbackResult.Applied

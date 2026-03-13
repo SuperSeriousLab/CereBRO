@@ -1,6 +1,6 @@
 # Threshold Modulator COG manifest.
 # PURE deterministic — translates GainSignal into per-detector threshold offsets.
-# CORTEX Phase 2 — Layer 2 (Gain Modulation).
+# Phase 2 — Layer 2 (Gain Modulation).
 
 name: "threshold-modulator"
 version: "0.1.0"
@@ -10,13 +10,13 @@ determinism: PURE
 ports {
   name: "gain_signal"
   direction: IN
-  message_type: "cortex.v1.GainSignal"
+  message_type: "cerebro.v1.GainSignal"
 }
 
 ports {
   name: "threshold_adjustments"
   direction: OUT
-  message_type: "cortex.v1.ThresholdAdjustments"
+  message_type: "cerebro.v1.ThresholdAdjustments"
 }
 
 ports {
@@ -26,7 +26,7 @@ ports {
 }
 
 contracts {
-  packages: "cortex.v1"
+  packages: "cerebro.v1"
   packages: "cog.core.v1"
   proto_hash: "sha256:pending"
 }
@@ -77,7 +77,7 @@ config {
 description: "Translates GainSignal into per-detector threshold adjustments — high urgency lowers thresholds (more sensitive), low formality raises thresholds (less sensitive)"
 
 tags: "cognitive"
-tags: "cortex"
+tags: "cerebro"
 tags: "neuromodulation"
 tags: "pure"
 

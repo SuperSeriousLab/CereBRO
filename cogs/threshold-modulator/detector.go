@@ -3,7 +3,7 @@
 // PURE deterministic — no LLM calls. Translates a GainSignal into
 // per-detector threshold adjustments. High urgency → lower thresholds
 // (more sensitive). Low formality → higher thresholds (less sensitive).
-// CORTEX Phase 2, Layer 2 (Gain Modulation).
+// Phase 2, Layer 2 (Gain Modulation).
 package main
 
 import (

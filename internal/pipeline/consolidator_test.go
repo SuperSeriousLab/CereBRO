@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	cerebrov1 "github.com/SuperSeriousLab/CereBRO/gen/go/cerebro/v1"
 	reasoningv1 "github.com/SuperSeriousLab/CereBRO/gen/go/cog/reasoning/v1"
@@ -440,6 +439,3 @@ func TestSubmitFeedback_UnknownID(t *testing.T) {
 		t.Fatalf("error should mention conversation ID, got: %v", err)
 	}
 }
-
-// Suppress unused import warnings.
-var _ = time.Now

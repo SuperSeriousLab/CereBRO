@@ -12,8 +12,8 @@ import (
 	reasoningv1 "github.com/SuperSeriousLab/CereBRO/gen/go/cog/reasoning/v1"
 )
 
-// findingTypeStr returns the string name of a finding type for scoring.
-func findingTypeStr(ft reasoningv1.FindingType) string {
+// FindingTypeString returns the string name of a finding type for scoring and corpus matching.
+func FindingTypeString(ft reasoningv1.FindingType) string {
 	return ft.String()
 }
 
@@ -170,14 +170,14 @@ func measureVariant(v ArchVariant, entries []CompetitionEntry) map[string]float6
 		// Collect actual finding types.
 		actualTypes := make(map[string]bool)
 		for _, finding := range result.Findings {
-			actualTypes[findingTypeStr(finding.FindingType)] = true
+			actualTypes[FindingTypeString(finding.FindingType)] = true
 		}
 
 		// If inhibitor is enabled, use the report findings (post-inhibition).
 		if v.Config.UseInhibitor && result.Report != nil {
 			actualTypes = make(map[string]bool)
 			for _, finding := range result.Report.GetFindings() {
-				actualTypes[findingTypeStr(finding.FindingType)] = true
+				actualTypes[FindingTypeString(finding.FindingType)] = true
 			}
 		}
 

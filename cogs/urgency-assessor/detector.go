@@ -3,7 +3,7 @@
 // PURE deterministic — no LLM calls. Scans conversation text for urgency
 // and stakes keywords, computes structural complexity and formality, and
 // produces a GainSignal for downstream threshold modulation.
-// CORTEX Phase 2, Layer 2 (Gain Modulation).
+// Phase 2, Layer 2 (Gain Modulation).
 package main
 
 import (

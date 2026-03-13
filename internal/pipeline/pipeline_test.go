@@ -72,26 +72,9 @@ func entryToSnapshot(entry *corpusEntry) (*reasoningv1.ConversationSnapshot, err
 	return snap, nil
 }
 
-// findingTypeString converts proto FindingType to the string used in corpus expected.
+// findingTypeString is a test-local alias for the exported FindingTypeString.
 func findingTypeString(ft reasoningv1.FindingType) string {
-	switch ft {
-	case reasoningv1.FindingType_ANCHORING_BIAS:
-		return "ANCHORING_BIAS"
-	case reasoningv1.FindingType_SUNK_COST_FALLACY:
-		return "SUNK_COST_FALLACY"
-	case reasoningv1.FindingType_CONTRADICTION:
-		return "CONTRADICTION"
-	case reasoningv1.FindingType_SCOPE_DRIFT:
-		return "SCOPE_DRIFT"
-	case reasoningv1.FindingType_CONFIDENCE_MISCALIBRATION:
-		return "CONFIDENCE_MISCALIBRATION"
-	case reasoningv1.FindingType_SILENT_REVISION:
-		return "SILENT_REVISION"
-	case reasoningv1.FindingType_STATUS_QUO_BIAS:
-		return "STATUS_QUO_BIAS"
-	default:
-		return ft.String()
-	}
+	return FindingTypeString(ft)
 }
 
 // TestSeedCorpus validates the pipeline against the existing seed corpus.
@@ -335,7 +318,7 @@ func setToSlice(s map[string]bool) []string {
 }
 
 // TestLLMConversationsWithInhibitor runs the full pipeline with the Context
-// Inhibitor enabled and measures post-inhibition metrics (CORTEX Phase 1).
+// Inhibitor enabled and measures post-inhibition metrics (Phase 1).
 func TestLLMConversationsWithInhibitor(t *testing.T) {
 	convDir := filepath.Join("..", "..", "data", "test-conversations")
 	if _, err := os.Stat(convDir); os.IsNotExist(err) {
@@ -429,7 +412,7 @@ func TestLLMConversationsWithInhibitor(t *testing.T) {
 	}
 
 	// Summary
-	t.Log("\n========== CORTEX PHASE 1 SCORECARD ==========")
+	t.Log("\n========== PHASE 1 SCORECARD ==========")
 	precision := 0.0
 	if totalTP+totalFP > 0 {
 		precision = float64(totalTP) / float64(totalTP+totalFP)
@@ -448,11 +431,11 @@ func TestLLMConversationsWithInhibitor(t *testing.T) {
 	t.Logf("  Inhibited=%d Disinhibited=%d", totalInhibited, totalDisinhibited)
 	t.Log("  ─────────────────────────────────────")
 	t.Log("  Baseline: Precision=0.64 Recall=1.00 F1=0.78 FP=5")
-	t.Logf("  CORTEX:   Precision=%.2f Recall=%.2f F1=%.2f FP=%d", precision, recall, f1, totalFP)
+	t.Logf("  Pipeline: Precision=%.2f Recall=%.2f F1=%.2f FP=%d", precision, recall, f1, totalFP)
 }
 
 // TestLLMConversationsWithNeuromodulation runs the full pipeline with Urgency
-// Assessor + Threshold Modulator + Context Inhibitor (CORTEX Phase 2).
+// Assessor + Threshold Modulator + Context Inhibitor (Phase 2).
 func TestLLMConversationsWithNeuromodulation(t *testing.T) {
 	convDir := filepath.Join("..", "..", "data", "test-conversations")
 	if _, err := os.Stat(convDir); os.IsNotExist(err) {
@@ -572,7 +555,7 @@ func TestLLMConversationsWithNeuromodulation(t *testing.T) {
 	}
 
 	// Summary
-	t.Log("\n========== CORTEX PHASE 2 SCORECARD ==========")
+	t.Log("\n========== PHASE 2 SCORECARD ==========")
 	precision := 0.0
 	if totalTP+totalFP > 0 {
 		precision = float64(totalTP) / float64(totalTP+totalFP)
@@ -708,7 +691,7 @@ func TestLLMConversationsWithLayer0(t *testing.T) {
 	}
 
 	// Summary
-	t.Log("\n========== CORTEX PHASE 3 SCORECARD ==========")
+	t.Log("\n========== PHASE 3 SCORECARD ==========")
 	precision := 0.0
 	if totalTP+totalFP > 0 {
 		precision = float64(totalTP) / float64(totalTP+totalFP)
@@ -883,7 +866,7 @@ func TestLLMConversationsWithMetacognition(t *testing.T) {
 	}
 
 	// Summary
-	t.Log("\n========== CORTEX PHASE 4 SCORECARD ==========")
+	t.Log("\n========== PHASE 4 SCORECARD ==========")
 	precision := 0.0
 	if totalTP+totalFP > 0 {
 		precision = float64(totalTP) / float64(totalTP+totalFP)
@@ -914,7 +897,7 @@ func TestLLMConversationsWithMetacognition(t *testing.T) {
 }
 
 // TestLLMConversationsWithSalience runs the full pipeline with all phases enabled
-// including Salience Filter + Memory Consolidator (CORTEX Phase 5).
+// including Salience Filter + Memory Consolidator (Phase 5).
 func TestLLMConversationsWithSalience(t *testing.T) {
 	convDir := filepath.Join("..", "..", "data", "test-conversations")
 	if _, err := os.Stat(convDir); os.IsNotExist(err) {
@@ -1063,7 +1046,7 @@ func TestLLMConversationsWithSalience(t *testing.T) {
 	}
 
 	// Summary
-	t.Log("\n========== CORTEX PHASE 5 SCORECARD ==========")
+	t.Log("\n========== PHASE 5 SCORECARD ==========")
 	precision := 0.0
 	if totalTP+totalFP > 0 {
 		precision = float64(totalTP) / float64(totalTP+totalFP)

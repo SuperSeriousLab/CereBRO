@@ -2,7 +2,7 @@
 //
 // PURE deterministic — no LLM calls. Scores findings by novelty and
 // actionability, filtering low-salience items that pass the Context Inhibitor.
-// CORTEX Phase 5, Layer 3 (Salience).
+// Phase 5, Layer 3 (Salience).
 //
 // The implementation delegates to internal/pipeline.FilterSalience().
 package main

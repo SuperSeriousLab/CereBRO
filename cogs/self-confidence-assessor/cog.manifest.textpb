@@ -1,7 +1,7 @@
 # Self-Confidence Assessor COG manifest.
 # PURE deterministic — assesses system confidence in its own findings.
 # Computes agreement, margin, and historical scores into an overall confidence.
-# CORTEX Phase 2 — Layer 4 (Self-Assessment).
+# Phase 2 — Layer 4 (Self-Assessment).
 
 name: "self-confidence-assessor"
 version: "0.1.0"
@@ -17,7 +17,7 @@ ports {
 ports {
   name: "self_confidence"
   direction: OUT
-  message_type: "cortex.v1.SelfConfidenceReport"
+  message_type: "cerebro.v1.SelfConfidenceReport"
 }
 
 ports {
@@ -28,7 +28,7 @@ ports {
 
 contracts {
   packages: "cog.reasoning.v1"
-  packages: "cortex.v1"
+  packages: "cerebro.v1"
   packages: "cog.core.v1"
   proto_hash: "sha256:pending"
 }
@@ -89,7 +89,7 @@ config {
 description: "Assesses system confidence in its own findings by computing agreement, margin, and historical scores into an overall self-confidence report"
 
 tags: "cognitive"
-tags: "cortex"
+tags: "cerebro"
 tags: "self-assessment"
 tags: "pure"
 

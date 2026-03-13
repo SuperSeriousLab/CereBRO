@@ -1,7 +1,7 @@
 # Context Inhibitor COG manifest.
 # PURE deterministic — basal ganglia inhibitory gating.
 # Default-suppresses all findings; selectively disinhibits through 5 gates.
-# CORTEX Phase 1 — Layer 3 (Inhibition).
+# Phase 1 — Layer 3 (Inhibition).
 
 name: "context-inhibitor"
 version: "0.1.0"
@@ -23,7 +23,7 @@ ports {
 ports {
   name: "gain_signal"
   direction: IN
-  message_type: "cortex.v1.GainSignal"
+  message_type: "cerebro.v1.GainSignal"
 }
 
 ports {
@@ -35,7 +35,7 @@ ports {
 ports {
   name: "inhibition_log"
   direction: OUT
-  message_type: "cortex.v1.InhibitionDecision"
+  message_type: "cerebro.v1.InhibitionDecision"
 }
 
 ports {
@@ -46,7 +46,7 @@ ports {
 
 contracts {
   packages: "cog.reasoning.v1"
-  packages: "cortex.v1"
+  packages: "cerebro.v1"
   packages: "cog.core.v1"
   proto_hash: "sha256:pending"
 }
@@ -107,7 +107,7 @@ config {
 description: "Basal ganglia inhibitory gating — default-suppresses all findings, selectively disinhibits through 5 gates: casual hedge, severity auto-pass, stakes, confidence, corroboration"
 
 tags: "cognitive"
-tags: "cortex"
+tags: "cerebro"
 tags: "inhibition"
 tags: "pure"
 

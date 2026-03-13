@@ -1,7 +1,7 @@
 # Salience Filter COG manifest.
 # PURE deterministic — scores findings by novelty and actionability.
 # Filters low-salience items that pass the Context Inhibitor.
-# CORTEX Phase 5 — Layer 3 (Salience).
+# Phase 5 — Layer 3 (Salience).
 
 name: "salience-filter"
 version: "0.1.0"
@@ -17,7 +17,7 @@ ports {
 ports {
   name: "salience_scores"
   direction: OUT
-  message_type: "cortex.v1.SalienceScore"
+  message_type: "cerebro.v1.SalienceScore"
 }
 
 ports {
@@ -34,7 +34,7 @@ ports {
 
 contracts {
   packages: "cog.reasoning.v1"
-  packages: "cortex.v1"
+  packages: "cerebro.v1"
   packages: "cog.core.v1"
   proto_hash: "sha256:pending"
 }
@@ -93,7 +93,7 @@ config {
 description: "Scores findings by novelty and actionability, filtering out low-salience items that pass the Context Inhibitor"
 
 tags: "cognitive"
-tags: "cortex"
+tags: "cerebro"
 tags: "salience"
 tags: "pure"
 

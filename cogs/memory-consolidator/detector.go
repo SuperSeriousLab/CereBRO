@@ -3,7 +3,7 @@
 // PURE deterministic — no LLM calls. Creates sparse index entries from pipeline
 // results and appends them to the Forge corpus in NDJSON format for the
 // Lamarckian learning loop.
-// CORTEX Phase 5, Layer 5 (Memory Consolidation).
+// Phase 5, Layer 5 (Memory Consolidation).
 //
 // The implementation delegates to internal/pipeline.Consolidator.
 package main

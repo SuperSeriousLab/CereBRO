@@ -1,7 +1,7 @@
 # Feedback Evaluator COG manifest.
 # PURE deterministic — re-evaluates low-confidence findings via feedback loop.
 # Checks self-confidence report and selectively re-runs detectors on weak findings.
-# CORTEX Phase 2 — Layer 5 (Feedback).
+# Phase 2 — Layer 5 (Feedback).
 
 name: "feedback-evaluator"
 version: "0.1.0"
@@ -17,7 +17,7 @@ ports {
 ports {
   name: "self_confidence"
   direction: IN
-  message_type: "cortex.v1.SelfConfidenceReport"
+  message_type: "cerebro.v1.SelfConfidenceReport"
 }
 
 ports {
@@ -46,7 +46,7 @@ ports {
 
 contracts {
   packages: "cog.reasoning.v1"
-  packages: "cortex.v1"
+  packages: "cerebro.v1"
   packages: "cog.core.v1"
   proto_hash: "sha256:pending"
 }
@@ -87,7 +87,7 @@ config {
 description: "Re-evaluates low-confidence findings when self-confidence is below threshold, selectively re-running detectors to improve or confirm weak findings"
 
 tags: "cognitive"
-tags: "cortex"
+tags: "cerebro"
 tags: "feedback"
 tags: "pure"
 

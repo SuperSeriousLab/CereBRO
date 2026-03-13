@@ -1,7 +1,7 @@
 # Urgency Assessor COG manifest.
 # PURE deterministic — keyword-based urgency, complexity, formality analysis.
 # Produces GainSignal (neuromodulatory context) for threshold modulation.
-# CORTEX Phase 2 — Layer 2 (Gain Modulation).
+# Phase 2 — Layer 2 (Gain Modulation).
 
 name: "urgency-assessor"
 version: "0.1.0"
@@ -17,7 +17,7 @@ ports {
 ports {
   name: "gain_signal"
   direction: OUT
-  message_type: "cortex.v1.GainSignal"
+  message_type: "cerebro.v1.GainSignal"
 }
 
 ports {
@@ -28,7 +28,7 @@ ports {
 
 contracts {
   packages: "cog.reasoning.v1"
-  packages: "cortex.v1"
+  packages: "cerebro.v1"
   packages: "cog.core.v1"
   proto_hash: "sha256:pending"
 }
@@ -69,7 +69,7 @@ config {
 description: "Keyword-based urgency, complexity, and formality assessor — produces GainSignal for threshold modulation across all detectors"
 
 tags: "cognitive"
-tags: "cortex"
+tags: "cerebro"
 tags: "neuromodulation"
 tags: "pure"
 

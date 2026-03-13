@@ -97,7 +97,7 @@ func NoModulationInfo() VariantInfo {
 	}
 }
 
-// InhibitorOnlyConfig returns Variant D: minimum viable CORTEX.
+// InhibitorOnlyConfig returns Variant D: minimum viable pipeline.
 // Detectors + Context Inhibitor + Aggregator. No Layer 0, no modulation,
 // no salience, no metacognition, no consolidation.
 // Stages: 1 → 2 → 3 → 4 → 5
@@ -119,7 +119,7 @@ func InhibitorOnlyInfo() VariantInfo {
 	}
 }
 
-// PreCortexConfig returns Variant E: pre-CORTEX baseline.
+// PreCortexConfig returns Variant E: pre-pipeline baseline.
 // No inhibition, no modulation, no metacognition, no consolidation.
 // All detector findings go straight to the aggregator unfiltered.
 // Stages: 1 → 2 → 3 → 5
@@ -131,7 +131,7 @@ func PreCortexConfig() PipelineConfig {
 func PreCortexInfo() VariantInfo {
 	return VariantInfo{
 		Name:        "E-pre-cortex",
-		Description: "Pre-CORTEX baseline, detectors → aggregator unfiltered",
+		Description: "Pre-pipeline baseline, detectors → aggregator unfiltered",
 		StageCount:  4,
 		CogCount:    10,
 	}

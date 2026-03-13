@@ -1,6 +1,6 @@
 # Format Validator COG manifest.
 # PURE deterministic — validates input structure and encoding.
-# CORTEX Phase 3 — Layer 0 (Brainstem Reflexes).
+# Phase 3 — Layer 0 (Brainstem Reflexes).
 
 name: "format-validator"
 version: "0.1.0"
@@ -16,7 +16,7 @@ ports {
 ports {
   name: "validation_result"
   direction: OUT
-  message_type: "cortex.v1.ValidationResult"
+  message_type: "cerebro.v1.ValidationResult"
 }
 
 ports {
@@ -27,7 +27,7 @@ ports {
 
 contracts {
   packages: "cog.reasoning.v1"
-  packages: "cortex.v1"
+  packages: "cerebro.v1"
   packages: "cog.core.v1"
   proto_hash: "sha256:pending"
 }
@@ -58,7 +58,7 @@ config {
 description: "Validates input ConversationSnapshot structure, encoding, and size limits before cognitive processing"
 
 tags: "cognitive"
-tags: "cortex"
+tags: "cerebro"
 tags: "layer0"
 tags: "pure"
 

@@ -17,7 +17,6 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -326,8 +325,3 @@ func (c *Consolidator) appendToFile(entry *consolidationJSON) error {
 	return nil
 }
 
-// Suppress unused import warnings — these are used by the implementation.
-var (
-	_ = strings.Join
-	_ = sort.Strings
-)

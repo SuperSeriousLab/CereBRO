@@ -1,6 +1,6 @@
-// Package pipeline provides an in-process cognitive pipeline for integration testing.
-// It ports the detection logic from the standalone COG binaries (cogs/*) into
-// importable functions. This enables end-to-end testing without bus transport.
+// Package pipeline implements CereBRO's 5-layer biomimetic cognitive pipeline.
+// It provides intake enrichment, 6 cognitive detectors, inhibition gating,
+// neuromodulation, metacognitive self-confidence, and memory consolidation.
 package pipeline
 
 import (

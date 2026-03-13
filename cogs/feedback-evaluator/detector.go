@@ -3,7 +3,7 @@
 // PURE deterministic — no LLM calls. Re-evaluates low-confidence findings
 // when overall self-confidence is below threshold. Selectively re-runs
 // detectors on weak findings to improve or confirm them.
-// CORTEX Phase 2, Layer 5 (Feedback).
+// Phase 2, Layer 5 (Feedback).
 //
 // The implementation delegates to internal/pipeline.EvaluateFeedback().
 package main
