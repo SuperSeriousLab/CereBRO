@@ -1,0 +1,366 @@
+# Cognitive Pipeline v7 — CORTEX Phase 5 composition.
+# Layer 0: Format Validator → Toxicity Gate → Language Detector (fast rejection)
+# Layer 1: Gateway → Intake → Urgency Assessor → Router → Threshold Modulator
+# Layer 2: [6 detectors]
+# Layer 3: Context Inhibitor → Salience Filter
+# Layer 4: Aggregator → Self-Confidence Assessor → Feedback Evaluator
+# Layer 5: Memory Consolidator
+# Phase 5 adds salience filtering and memory consolidation (Lamarckian learning loop).
+
+name: "cognitive-pipeline-v7"
+version: "0.1.0"
+
+# Layer 0: Brainstem Reflexes (Phase 3)
+cogs {
+  name: "format-validator"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "toxicity-gate"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "language-detector"
+  version: "0.1.0"
+}
+
+# Layer 1: Intake + Routing
+cogs {
+  name: "cognitive-gateway"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "conversation-intake"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "claim-extractor"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "urgency-assessor"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "cognitive-router"
+  version: "0.1.0"
+}
+
+# Layer 2.5: Threshold Modulator
+cogs {
+  name: "threshold-modulator"
+  version: "0.1.0"
+}
+
+# Layer 2: Detectors
+cogs {
+  name: "anchoring-detector"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "sunk-cost-detector"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "contradiction-tracker"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "scope-guard"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "confidence-calibrator"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "decision-ledger"
+  version: "0.1.0"
+}
+
+# Layer 3: Inhibition + Salience (Phase 5)
+cogs {
+  name: "context-inhibitor"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "salience-filter"
+  version: "0.1.0"
+}
+
+# Layer 4: Aggregation + Metacognition (Phase 4)
+cogs {
+  name: "synthesis-aggregator"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "self-confidence-assessor"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "feedback-evaluator"
+  version: "0.1.0"
+}
+
+# Layer 5: Memory Consolidation (Phase 5)
+cogs {
+  name: "memory-consolidator"
+  version: "0.1.0"
+}
+
+# === Layer 0 wires (Stage 0: format → toxicity → language) ===
+
+# Gateway feeds raw snapshot to Format Validator
+wires {
+  source_cog: "cognitive-gateway"
+  source_port: "conversation_snapshot"
+  target_cog: "format-validator"
+  target_port: "conversation_snapshot"
+}
+
+# Format Validator passes validated snapshot to Toxicity Gate
+wires {
+  source_cog: "format-validator"
+  source_port: "validation_result"
+  target_cog: "toxicity-gate"
+  target_port: "conversation_snapshot"
+}
+
+# Toxicity Gate passes screened snapshot to Language Detector
+wires {
+  source_cog: "toxicity-gate"
+  source_port: "toxicity_result"
+  target_cog: "language-detector"
+  target_port: "conversation_snapshot"
+}
+
+# Language Detector passes accepted snapshot to Intake
+wires {
+  source_cog: "language-detector"
+  source_port: "language_result"
+  target_cog: "conversation-intake"
+  target_port: "conversation_snapshot"
+}
+
+# === Stage 1+ wires ===
+
+# Intake enriches and sends to Router, Claim Extractor, Urgency Assessor, and Inhibitor
+wires {
+  source_cog: "conversation-intake"
+  source_port: "enriched_snapshot"
+  target_cog: "cognitive-router"
+  target_port: "conversation_snapshot"
+}
+
+wires {
+  source_cog: "conversation-intake"
+  source_port: "enriched_snapshot"
+  target_cog: "claim-extractor"
+  target_port: "conversation_snapshot"
+}
+
+# Stage 1.5: Urgency Assessor receives enriched snapshot
+wires {
+  source_cog: "conversation-intake"
+  source_port: "enriched_snapshot"
+  target_cog: "urgency-assessor"
+  target_port: "conversation_snapshot"
+}
+
+# Urgency Assessor emits GainSignal to Threshold Modulator
+wires {
+  source_cog: "urgency-assessor"
+  source_port: "gain_signal"
+  target_cog: "threshold-modulator"
+  target_port: "gain_signal"
+}
+
+# Urgency Assessor also sends GainSignal to Context Inhibitor (real urgency/formality)
+wires {
+  source_cog: "urgency-assessor"
+  source_port: "gain_signal"
+  target_cog: "context-inhibitor"
+  target_port: "gain_signal"
+}
+
+# Intake snapshot also goes to Context Inhibitor for turn text access
+wires {
+  source_cog: "conversation-intake"
+  source_port: "enriched_snapshot"
+  target_cog: "context-inhibitor"
+  target_port: "conversation_snapshot"
+}
+
+# Router fans out to detectors
+wires {
+  source_cog: "cognitive-router"
+  source_port: "anchoring_snapshot"
+  target_cog: "anchoring-detector"
+  target_port: "conversation_snapshot"
+}
+
+wires {
+  source_cog: "cognitive-router"
+  source_port: "sunk_cost_snapshot"
+  target_cog: "sunk-cost-detector"
+  target_port: "conversation_snapshot"
+}
+
+wires {
+  source_cog: "cognitive-router"
+  source_port: "contradiction_snapshot"
+  target_cog: "contradiction-tracker"
+  target_port: "conversation_snapshot"
+}
+
+wires {
+  source_cog: "cognitive-router"
+  source_port: "scope_snapshot"
+  target_cog: "scope-guard"
+  target_port: "conversation_snapshot"
+}
+
+wires {
+  source_cog: "cognitive-router"
+  source_port: "calibration_snapshot"
+  target_cog: "confidence-calibrator"
+  target_port: "conversation_snapshot"
+}
+
+wires {
+  source_cog: "cognitive-router"
+  source_port: "decision_snapshot"
+  target_cog: "decision-ledger"
+  target_port: "conversation_snapshot"
+}
+
+# All detectors fan in assessments to Context Inhibitor (not directly to Aggregator)
+wires {
+  source_cog: "anchoring-detector"
+  source_port: "assessment"
+  target_cog: "context-inhibitor"
+  target_port: "assessments"
+}
+
+wires {
+  source_cog: "sunk-cost-detector"
+  source_port: "assessment"
+  target_cog: "context-inhibitor"
+  target_port: "assessments"
+}
+
+wires {
+  source_cog: "contradiction-tracker"
+  source_port: "assessment"
+  target_cog: "context-inhibitor"
+  target_port: "assessments"
+}
+
+wires {
+  source_cog: "scope-guard"
+  source_port: "assessment"
+  target_cog: "context-inhibitor"
+  target_port: "assessments"
+}
+
+wires {
+  source_cog: "confidence-calibrator"
+  source_port: "assessment"
+  target_cog: "context-inhibitor"
+  target_port: "assessments"
+}
+
+wires {
+  source_cog: "decision-ledger"
+  source_port: "assessment"
+  target_cog: "context-inhibitor"
+  target_port: "assessments"
+}
+
+# === Layer 3: Salience Filter (Phase 5) ===
+
+# Context Inhibitor gates findings to Salience Filter (was: directly to Aggregator in v6)
+wires {
+  source_cog: "context-inhibitor"
+  source_port: "gated_assessments"
+  target_cog: "salience-filter"
+  target_port: "gated_assessments"
+}
+
+# Salience Filter passes salient assessments to Aggregator
+wires {
+  source_cog: "salience-filter"
+  source_port: "salient_assessments"
+  target_cog: "synthesis-aggregator"
+  target_port: "assessment"
+}
+
+# === Layer 4: Metacognition wires (Phase 4) ===
+
+# Aggregator report goes to Self-Confidence Assessor
+wires {
+  source_cog: "synthesis-aggregator"
+  source_port: "report"
+  target_cog: "self-confidence-assessor"
+  target_port: "reasoning_report"
+}
+
+# Self-Confidence report goes to Feedback Evaluator
+wires {
+  source_cog: "self-confidence-assessor"
+  source_port: "self_confidence"
+  target_cog: "feedback-evaluator"
+  target_port: "self_confidence"
+}
+
+# Enriched snapshot goes to Feedback Evaluator (for detector re-runs)
+wires {
+  source_cog: "conversation-intake"
+  source_port: "enriched_snapshot"
+  target_cog: "feedback-evaluator"
+  target_port: "conversation_snapshot"
+}
+
+# Aggregator report also goes to Feedback Evaluator (for original report context)
+wires {
+  source_cog: "synthesis-aggregator"
+  source_port: "report"
+  target_cog: "feedback-evaluator"
+  target_port: "reasoning_report"
+}
+
+# === Layer 5: Memory Consolidation wires (Phase 5) ===
+
+# Aggregator report goes to Memory Consolidator
+wires {
+  source_cog: "synthesis-aggregator"
+  source_port: "report"
+  target_cog: "memory-consolidator"
+  target_port: "cortex_report"
+}
+
+# Enriched snapshot goes to Memory Consolidator (for turn context)
+wires {
+  source_cog: "conversation-intake"
+  source_port: "enriched_snapshot"
+  target_cog: "memory-consolidator"
+  target_port: "conversation_snapshot"
+}
+
+status: VALID
+
+description: "CORTEX Phase 5 cognitive pipeline — Layer 0 (format-validator → toxicity-gate → language-detector) → Gateway → Intake → Urgency Assessor → Router → Threshold Modulator → [6 detectors] → Context Inhibitor → Salience Filter → Aggregator → Self-Confidence Assessor → Feedback Evaluator → Memory Consolidator. 21 COGs, 30 wires."

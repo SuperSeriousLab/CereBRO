@@ -1,0 +1,98 @@
+# Self-Confidence Assessor COG manifest.
+# PURE deterministic — assesses system confidence in its own findings.
+# Computes agreement, margin, and historical scores into an overall confidence.
+# CORTEX Phase 2 — Layer 4 (Self-Assessment).
+
+name: "self-confidence-assessor"
+version: "0.1.0"
+language: GO
+determinism: PURE
+
+ports {
+  name: "reasoning_report"
+  direction: IN
+  message_type: "cog.reasoning.v1.ReasoningReport"
+}
+
+ports {
+  name: "self_confidence"
+  direction: OUT
+  message_type: "cortex.v1.SelfConfidenceReport"
+}
+
+ports {
+  name: "_error"
+  direction: OUT
+  message_type: "cog.core.v1.ErrorEvent"
+}
+
+contracts {
+  packages: "cog.reasoning.v1"
+  packages: "cortex.v1"
+  packages: "cog.core.v1"
+  proto_hash: "sha256:pending"
+}
+
+config {
+  fields {
+    name: "agreement_weight"
+    type: DOUBLE
+    default_value: "0.4"
+    required: false
+    description: "Weight for cross-detector agreement score (0.0-1.0)"
+    min_value: "0.0"
+    max_value: "1.0"
+    evolvable: true
+  }
+  fields {
+    name: "margin_weight"
+    type: DOUBLE
+    default_value: "0.35"
+    required: false
+    description: "Weight for confidence margin score (0.0-1.0)"
+    min_value: "0.0"
+    max_value: "1.0"
+    evolvable: true
+  }
+  fields {
+    name: "historical_weight"
+    type: DOUBLE
+    default_value: "0.25"
+    required: false
+    description: "Weight for historical consistency score (0.0-1.0)"
+    min_value: "0.0"
+    max_value: "1.0"
+    evolvable: true
+  }
+  fields {
+    name: "high_confidence_threshold"
+    type: DOUBLE
+    default_value: "0.8"
+    required: false
+    description: "Above this, overall confidence is considered high (0.0-1.0)"
+    min_value: "0.0"
+    max_value: "1.0"
+    evolvable: true
+  }
+  fields {
+    name: "moderate_confidence_threshold"
+    type: DOUBLE
+    default_value: "0.5"
+    required: false
+    description: "Above this, overall confidence is considered moderate (0.0-1.0)"
+    min_value: "0.0"
+    max_value: "1.0"
+    evolvable: true
+  }
+}
+
+description: "Assesses system confidence in its own findings by computing agreement, margin, and historical scores into an overall self-confidence report"
+
+tags: "cognitive"
+tags: "cortex"
+tags: "self-assessment"
+tags: "pure"
+
+lineage {
+  level: HAND_WRITTEN
+}

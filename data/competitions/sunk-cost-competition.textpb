@@ -1,0 +1,149 @@
+# Sunk-Cost Detector Competition — original vs proximity-weighted variant.
+
+name: "sunk-cost-detector-competition"
+version: "0.1.0"
+status: DEFINED
+
+arena {
+  in_type: "cog.reasoning.v1.ConversationSnapshot"
+  out_type: "cog.reasoning.v1.CognitiveAssessment"
+}
+
+contestants {
+  id: "original"
+  source_type: "cog"
+  source_ref: "sunk-cost-detector:0.1.0"
+  status: CONTESTANT_VALID
+}
+
+contestants {
+  id: "proximity-weighted"
+  source_type: "cog"
+  source_ref: "sunk-cost-detector-proximity:0.1.0"
+  status: CONTESTANT_VALID
+}
+
+traits {
+  name: "precision"
+  direction: MAXIMIZE
+  builtin: false
+  scoring_ref: "cognitive-scoring-precision"
+}
+
+traits {
+  name: "recall"
+  direction: MAXIMIZE
+  builtin: false
+  scoring_ref: "cognitive-scoring-recall"
+}
+
+traits {
+  name: "f1"
+  direction: MAXIMIZE
+  builtin: false
+  scoring_ref: "cognitive-scoring-f1"
+}
+
+traits {
+  name: "false_positive_rate"
+  direction: MINIMIZE
+  builtin: false
+  scoring_ref: "cognitive-scoring-fpr"
+}
+
+traits {
+  name: "latency_p99"
+  direction: MINIMIZE
+  builtin: true
+}
+
+profiles {
+  name: "balanced"
+  weights {
+    key: "precision"
+    value: 0.25
+  }
+  weights {
+    key: "recall"
+    value: 0.25
+  }
+  weights {
+    key: "f1"
+    value: 0.3
+  }
+  weights {
+    key: "false_positive_rate"
+    value: 0.15
+  }
+  weights {
+    key: "latency_p99"
+    value: 0.05
+  }
+}
+
+profiles {
+  name: "precision-first"
+  weights {
+    key: "precision"
+    value: 0.4
+  }
+  weights {
+    key: "recall"
+    value: 0.15
+  }
+  weights {
+    key: "f1"
+    value: 0.2
+  }
+  weights {
+    key: "false_positive_rate"
+    value: 0.2
+  }
+  weights {
+    key: "latency_p99"
+    value: 0.05
+  }
+}
+
+profiles {
+  name: "recall-first"
+  weights {
+    key: "precision"
+    value: 0.15
+  }
+  weights {
+    key: "recall"
+    value: 0.4
+  }
+  weights {
+    key: "f1"
+    value: 0.2
+  }
+  weights {
+    key: "false_positive_rate"
+    value: 0.1
+  }
+  weights {
+    key: "latency_p99"
+    value: 0.15
+  }
+}
+
+corpus {
+  path: "data/test-conversations"
+  message_count: 8
+  labeled: true
+  corpus_hash: "sha256:pending"
+}
+
+config {
+  message_timeout_ms: 500
+  max_parallel: 2
+  auto_start: false
+  auto_promote: false
+  optimize_winner: true
+  optimize_generations: 50
+  optimize_population: 100
+}
+
+description: "Compete original sunk-cost detector against proximity-weighted variant"

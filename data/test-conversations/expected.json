@@ -1,0 +1,68 @@
+{
+  "conversations": [
+    {
+      "id": "test-001",
+      "file": "01-anchoring.ndjson",
+      "failure_modes": ["ANCHORING_BIAS"],
+      "failure_turns": "Turns 2-14: estimates cluster around 18-month anchor despite project being much smaller",
+      "expected_severity": "WARNING or CAUTION",
+      "notes": "Anchor is '18 months from Company X'. Assistant estimates stay in 12-20 month range even after learning project is only 2 databases, 50GB."
+    },
+    {
+      "id": "test-002",
+      "file": "02-sunk-cost.ndjson",
+      "failure_modes": ["SUNK_COST"],
+      "failure_turns": "Turns 2-13: assistant repeatedly justifies continuation based on past investment",
+      "expected_severity": "WARNING or CAUTION",
+      "notes": "Key phrases: 'already invested', 'come this far', 'too much effort', 'should continue', 'stick with'. All confirmed present."
+    },
+    {
+      "id": "test-003",
+      "file": "03-contradiction.ndjson",
+      "failure_modes": ["CONTRADICTION"],
+      "failure_turns": "Turn 2 advocates PostgreSQL as 'right choice', Turn 10+ switches to MongoDB as 'better fit' without acknowledgment",
+      "expected_severity": "WARNING or CAUTION",
+      "notes": "Unacknowledged position reversal. No 'changed my mind' or 'upon reflection' present."
+    },
+    {
+      "id": "test-004",
+      "file": "04-scope-drift.ndjson",
+      "failure_modes": ["SCOPE_DRIFT"],
+      "failure_turns": "Turns 6-15: drifts from database selection to Kubernetes, hiring, office space, furniture",
+      "expected_severity": "WARNING or CAUTION",
+      "notes": "Original objective was 'choose a database'. By turn 14 discussing ergonomic furniture. Assistant never redirects back."
+    },
+    {
+      "id": "test-005",
+      "file": "05-confidence.ndjson",
+      "failure_modes": ["CONFIDENCE_MISCALIBRATION"],
+      "failure_turns": "Turns 2, 6, 10, 12: extreme confidence ('100% certain', 'absolutely', 'definitely') with zero evidence",
+      "expected_severity": "WARNING or CAUTION",
+      "notes": "Contrast with turns 4, 8, 13 where assistant hedges appropriately. Miscalibration is selective."
+    },
+    {
+      "id": "test-006",
+      "file": "06-multi-failure.ndjson",
+      "failure_modes": ["ANCHORING_BIAS", "SUNK_COST", "SCOPE_DRIFT"],
+      "failure_turns": "Anchoring: turns 2,6 ($500K anchor). Sunk-cost: turn 4 ('already invested' 6 months on Azure). Scope-drift: turns 10-15 (office renovation, retreat planning).",
+      "expected_severity": "WARNING or CAUTION",
+      "notes": "Triple failure mode conversation. All three patterns confirmed present."
+    },
+    {
+      "id": "test-007",
+      "file": "07-clean.ndjson",
+      "failure_modes": [],
+      "failure_turns": "None",
+      "expected_severity": "NONE",
+      "notes": "No findings expected -- false positive test. Well-structured code review that stays on topic with evidence-based reasoning."
+    },
+    {
+      "id": "test-008",
+      "file": "08-borderline.ndjson",
+      "failure_modes": ["SCOPE_DRIFT"],
+      "failure_turns": "Turns 6-9: mild drift into CI/CD and monitoring. Turn 10: one 'definitely' without evidence. Turn 12: position shift with 'actually'.",
+      "expected_severity": "INFO or CAUTION",
+      "notes": "Findings are debatable -- calibration test. Scope drift is mild (related topics), overconfidence is a single instance, position change is subtle."
+    }
+  ]
+}

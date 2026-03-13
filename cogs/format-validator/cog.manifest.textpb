@@ -1,0 +1,67 @@
+# Format Validator COG manifest.
+# PURE deterministic — validates input structure and encoding.
+# CORTEX Phase 3 — Layer 0 (Brainstem Reflexes).
+
+name: "format-validator"
+version: "0.1.0"
+language: GO
+determinism: PURE
+
+ports {
+  name: "conversation_snapshot"
+  direction: IN
+  message_type: "cog.reasoning.v1.ConversationSnapshot"
+}
+
+ports {
+  name: "validation_result"
+  direction: OUT
+  message_type: "cortex.v1.ValidationResult"
+}
+
+ports {
+  name: "_error"
+  direction: OUT
+  message_type: "cog.core.v1.ErrorEvent"
+}
+
+contracts {
+  packages: "cog.reasoning.v1"
+  packages: "cortex.v1"
+  packages: "cog.core.v1"
+  proto_hash: "sha256:pending"
+}
+
+config {
+  fields {
+    name: "max_input_bytes"
+    type: UINT32
+    default_value: "1048576"
+    required: false
+    description: "Maximum input size in bytes (default 1MB)"
+    min_value: "1024"
+    max_value: "104857600"
+    evolvable: false
+  }
+  fields {
+    name: "max_turns"
+    type: UINT32
+    default_value: "500"
+    required: false
+    description: "Maximum number of turns allowed"
+    min_value: "1"
+    max_value: "10000"
+    evolvable: false
+  }
+}
+
+description: "Validates input ConversationSnapshot structure, encoding, and size limits before cognitive processing"
+
+tags: "cognitive"
+tags: "cortex"
+tags: "layer0"
+tags: "pure"
+
+lineage {
+  level: HAND_WRITTEN
+}

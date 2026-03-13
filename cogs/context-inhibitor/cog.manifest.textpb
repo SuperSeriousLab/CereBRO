@@ -1,0 +1,116 @@
+# Context Inhibitor COG manifest.
+# PURE deterministic — basal ganglia inhibitory gating.
+# Default-suppresses all findings; selectively disinhibits through 5 gates.
+# CORTEX Phase 1 — Layer 3 (Inhibition).
+
+name: "context-inhibitor"
+version: "0.1.0"
+language: GO
+determinism: PURE
+
+ports {
+  name: "assessments"
+  direction: IN
+  message_type: "cog.reasoning.v1.CognitiveAssessment"
+}
+
+ports {
+  name: "conversation_snapshot"
+  direction: IN
+  message_type: "cog.reasoning.v1.ConversationSnapshot"
+}
+
+ports {
+  name: "gain_signal"
+  direction: IN
+  message_type: "cortex.v1.GainSignal"
+}
+
+ports {
+  name: "gated_assessments"
+  direction: OUT
+  message_type: "cog.reasoning.v1.CognitiveAssessment"
+}
+
+ports {
+  name: "inhibition_log"
+  direction: OUT
+  message_type: "cortex.v1.InhibitionDecision"
+}
+
+ports {
+  name: "_error"
+  direction: OUT
+  message_type: "cog.core.v1.ErrorEvent"
+}
+
+contracts {
+  packages: "cog.reasoning.v1"
+  packages: "cortex.v1"
+  packages: "cog.core.v1"
+  proto_hash: "sha256:pending"
+}
+
+config {
+  fields {
+    name: "corroboration_threshold"
+    type: DOUBLE
+    default_value: "0.1"
+    required: false
+    description: "Minimum cross-detector corroboration to pass gate 5 (0.0-1.0)"
+    min_value: "0.0"
+    max_value: "1.0"
+    evolvable: true
+  }
+  fields {
+    name: "confidence_threshold_warn"
+    type: DOUBLE
+    default_value: "0.55"
+    required: false
+    description: "Minimum confidence for WARNING findings to pass gate 4 (0.0-1.0)"
+    min_value: "0.0"
+    max_value: "1.0"
+    evolvable: true
+  }
+  fields {
+    name: "formality_threshold"
+    type: DOUBLE
+    default_value: "0.85"
+    required: false
+    description: "Below this formality score, casual hedge suppression activates (0.0-1.0)"
+    min_value: "0.0"
+    max_value: "1.0"
+    evolvable: true
+  }
+  fields {
+    name: "stakes_threshold"
+    type: DOUBLE
+    default_value: "0.1"
+    required: false
+    description: "Below this urgency, low-severity findings are suppressed (0.0-1.0)"
+    min_value: "0.0"
+    max_value: "1.0"
+    evolvable: true
+  }
+  fields {
+    name: "proximity_window_turns"
+    type: UINT32
+    default_value: "2"
+    required: false
+    description: "Number of turns around a finding to search for corroborating detectors"
+    min_value: "0"
+    max_value: "10"
+    evolvable: true
+  }
+}
+
+description: "Basal ganglia inhibitory gating — default-suppresses all findings, selectively disinhibits through 5 gates: casual hedge, severity auto-pass, stakes, confidence, corroboration"
+
+tags: "cognitive"
+tags: "cortex"
+tags: "inhibition"
+tags: "pure"
+
+lineage {
+  level: HAND_WRITTEN
+}

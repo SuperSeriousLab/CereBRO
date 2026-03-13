@@ -1,0 +1,99 @@
+# Memory Consolidator COG manifest.
+# PURE deterministic — creates sparse index entries from pipeline results.
+# Appends to Forge corpus in NDJSON format for Lamarckian learning loop.
+# CORTEX Phase 5 — Layer 5 (Memory Consolidation).
+
+name: "memory-consolidator"
+version: "0.1.0"
+language: GO
+determinism: PURE
+
+ports {
+  name: "cortex_report"
+  direction: IN
+  message_type: "cortex.v1.CortexReport"
+}
+
+ports {
+  name: "conversation_snapshot"
+  direction: IN
+  message_type: "cog.reasoning.v1.ConversationSnapshot"
+}
+
+ports {
+  name: "consolidation_entry"
+  direction: OUT
+  message_type: "cortex.v1.ConsolidationEntry"
+}
+
+ports {
+  name: "_error"
+  direction: OUT
+  message_type: "cog.core.v1.ErrorEvent"
+}
+
+contracts {
+  packages: "cortex.v1"
+  packages: "cog.reasoning.v1"
+  packages: "cog.core.v1"
+  proto_hash: "sha256:pending"
+}
+
+config {
+  fields {
+    name: "corpus_output_path"
+    type: STRING
+    default_value: "data/corpus/consolidated.ndjson"
+    required: false
+    description: "Path to consolidated corpus output file"
+    evolvable: false
+  }
+  fields {
+    name: "min_confidence_for_auto"
+    type: DOUBLE
+    default_value: "0.8"
+    required: false
+    description: "Minimum confidence for automatic consolidation (0.5-0.95)"
+    min_value: "0.5"
+    max_value: "0.95"
+    evolvable: true
+  }
+  fields {
+    name: "min_agreement_for_auto"
+    type: DOUBLE
+    default_value: "0.7"
+    required: false
+    description: "Minimum agreement for automatic consolidation (0.3-0.95)"
+    min_value: "0.3"
+    max_value: "0.95"
+    evolvable: true
+  }
+  fields {
+    name: "consolidation_cooldown_sec"
+    type: UINT32
+    default_value: "60"
+    required: false
+    description: "Minimum seconds between consolidations"
+    evolvable: false
+  }
+  fields {
+    name: "max_entries_per_session"
+    type: UINT32
+    default_value: "10"
+    required: false
+    description: "Maximum consolidation entries per session"
+    evolvable: false
+  }
+}
+
+description: "Creates sparse index entries from pipeline results and appends them to the Forge corpus for the Lamarckian learning loop"
+
+tags: "cognitive"
+tags: "cortex"
+tags: "memory"
+tags: "consolidation"
+tags: "pure"
+
+lineage {
+  level: HAND_WRITTEN
+}

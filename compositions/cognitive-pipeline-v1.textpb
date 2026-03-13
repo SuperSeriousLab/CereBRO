@@ -1,0 +1,61 @@
+# Cognitive Pipeline v1 — First composition.
+# Intake → [Anchoring Detector, Sunk-Cost Detector] → Synthesis Aggregator.
+#
+# This is a VALID composition — all COGs and wires are defined, no gaps.
+
+name: "cognitive-pipeline-v1"
+version: "0.1.0"
+
+cogs {
+  name: "conversation-intake"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "anchoring-detector"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "sunk-cost-detector"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "synthesis-aggregator"
+  version: "0.1.0"
+}
+
+# Intake fans out enriched snapshots to both detectors
+wires {
+  source_cog: "conversation-intake"
+  source_port: "enriched_snapshot"
+  target_cog: "anchoring-detector"
+  target_port: "conversation_snapshot"
+}
+
+wires {
+  source_cog: "conversation-intake"
+  source_port: "enriched_snapshot"
+  target_cog: "sunk-cost-detector"
+  target_port: "conversation_snapshot"
+}
+
+# Both detectors fan in assessments to the aggregator (diamond collector)
+wires {
+  source_cog: "anchoring-detector"
+  source_port: "assessment"
+  target_cog: "synthesis-aggregator"
+  target_port: "assessment"
+}
+
+wires {
+  source_cog: "sunk-cost-detector"
+  source_port: "assessment"
+  target_cog: "synthesis-aggregator"
+  target_port: "assessment"
+}
+
+status: VALID
+
+description: "First cognitive reasoning pipeline — detects anchoring bias and sunk-cost fallacy in conversations"

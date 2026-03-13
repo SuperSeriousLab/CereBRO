@@ -1,0 +1,83 @@
+# Language Detector COG manifest.
+# PURE deterministic — trigram frequency language detection.
+# CORTEX Phase 3 — Layer 0 (Brainstem Reflexes).
+
+name: "language-detector"
+version: "0.1.0"
+language: GO
+determinism: PURE
+
+ports {
+  name: "conversation_snapshot"
+  direction: IN
+  message_type: "cog.reasoning.v1.ConversationSnapshot"
+}
+
+ports {
+  name: "language_result"
+  direction: OUT
+  message_type: "cortex.v1.LanguageResult"
+}
+
+ports {
+  name: "_error"
+  direction: OUT
+  message_type: "cog.core.v1.ErrorEvent"
+}
+
+contracts {
+  packages: "cog.reasoning.v1"
+  packages: "cortex.v1"
+  packages: "cog.core.v1"
+  proto_hash: "sha256:pending"
+}
+
+config {
+  fields {
+    name: "supported_languages"
+    type: STRING
+    default_value: "en"
+    required: false
+    description: "Comma-separated list of supported language codes"
+    evolvable: false
+  }
+  fields {
+    name: "min_confidence"
+    type: DOUBLE
+    default_value: "0.7"
+    required: false
+    description: "Minimum confidence to accept a detection"
+    min_value: "0.3"
+    max_value: "0.95"
+    evolvable: true
+  }
+  fields {
+    name: "fallback_language"
+    type: STRING
+    default_value: "en"
+    required: false
+    description: "Language code to use when detection confidence is too low"
+    evolvable: false
+  }
+  fields {
+    name: "min_sample_chars"
+    type: UINT32
+    default_value: "20"
+    required: false
+    description: "Minimum characters needed for reliable detection"
+    min_value: "5"
+    max_value: "200"
+    evolvable: false
+  }
+}
+
+description: "Trigram frequency language detection (Cavnar & Trenkle 1994) — detects dominant language from conversation text"
+
+tags: "cognitive"
+tags: "cortex"
+tags: "layer0"
+tags: "pure"
+
+lineage {
+  level: HAND_WRITTEN
+}

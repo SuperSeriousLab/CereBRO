@@ -1,0 +1,92 @@
+# CORTEX Architecture Competition manifest.
+# Competes 5 pipeline configurations against the test corpus.
+# Run via: go test ./internal/pipeline/ -run TestArchitectureCompetition -v
+
+name: "cortex-architecture-competition"
+version: "0.1.0"
+
+arena {
+  in_type: "cog.reasoning.v1.ConversationSnapshot"
+  out_type: "cortex.v1.CortexReport"
+}
+
+contestants {
+  id: "full-cortex"
+  source_type: "pipeline_config"
+  source_ref: "FullCortexConfig"
+}
+
+contestants {
+  id: "no-feedback"
+  source_type: "pipeline_config"
+  source_ref: "NoFeedbackConfig"
+}
+
+contestants {
+  id: "no-modulation"
+  source_type: "pipeline_config"
+  source_ref: "NoModulationConfig"
+}
+
+contestants {
+  id: "inhibitor-only"
+  source_type: "pipeline_config"
+  source_ref: "InhibitorOnlyConfig"
+}
+
+contestants {
+  id: "pre-cortex"
+  source_type: "pipeline_config"
+  source_ref: "PreCortexConfig"
+}
+
+traits { name: "f1" direction: MAXIMIZE }
+traits { name: "precision" direction: MAXIMIZE }
+traits { name: "recall" direction: MAXIMIZE }
+traits { name: "false_positive_rate" direction: MINIMIZE }
+traits { name: "latency_mean_ms" direction: MINIMIZE }
+traits { name: "latency_p95_ms" direction: MINIMIZE }
+traits { name: "latency_p99_ms" direction: MINIMIZE }
+traits { name: "stage_count" direction: MINIMIZE }
+traits { name: "cog_count" direction: MINIMIZE }
+
+profiles {
+  name: "balanced"
+  weights { key: "f1" value: 0.35 }
+  weights { key: "precision" value: 0.15 }
+  weights { key: "recall" value: 0.15 }
+  weights { key: "latency_mean_ms" value: 0.15 }
+  weights { key: "latency_p95_ms" value: 0.10 }
+  weights { key: "stage_count" value: 0.05 }
+  weights { key: "cog_count" value: 0.05 }
+}
+
+profiles {
+  name: "precision-first"
+  weights { key: "precision" value: 0.40 }
+  weights { key: "f1" value: 0.20 }
+  weights { key: "false_positive_rate" value: 0.20 }
+  weights { key: "recall" value: 0.10 }
+  weights { key: "latency_mean_ms" value: 0.05 }
+  weights { key: "stage_count" value: 0.05 }
+}
+
+profiles {
+  name: "recall-first"
+  weights { key: "recall" value: 0.40 }
+  weights { key: "f1" value: 0.25 }
+  weights { key: "precision" value: 0.15 }
+  weights { key: "latency_mean_ms" value: 0.10 }
+  weights { key: "stage_count" value: 0.05 }
+  weights { key: "cog_count" value: 0.05 }
+}
+
+profiles {
+  name: "minimal"
+  weights { key: "f1" value: 0.25 }
+  weights { key: "latency_mean_ms" value: 0.20 }
+  weights { key: "stage_count" value: 0.20 }
+  weights { key: "cog_count" value: 0.15 }
+  weights { key: "precision" value: 0.10 }
+  weights { key: "recall" value: 0.10 }
+}

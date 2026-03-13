@@ -1,0 +1,204 @@
+# Cognitive Pipeline v3 — CORTEX Phase 1 composition.
+# Gateway → Intake → Router → [6 detectors] → Context Inhibitor → Aggregator
+# Plus Claim Extractor feeding claim-dependent detectors.
+# Context Inhibitor (Layer 3) gates findings before Aggregator.
+
+name: "cognitive-pipeline-v3"
+version: "0.1.0"
+
+cogs {
+  name: "cognitive-gateway"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "conversation-intake"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "claim-extractor"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "cognitive-router"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "anchoring-detector"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "sunk-cost-detector"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "contradiction-tracker"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "scope-guard"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "confidence-calibrator"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "decision-ledger"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "context-inhibitor"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "synthesis-aggregator"
+  version: "0.1.0"
+}
+
+# Gateway emits snapshot into pipeline
+wires {
+  source_cog: "cognitive-gateway"
+  source_port: "conversation_snapshot"
+  target_cog: "conversation-intake"
+  target_port: "conversation_snapshot"
+}
+
+# Intake enriches and sends to Router + Claim Extractor
+wires {
+  source_cog: "conversation-intake"
+  source_port: "enriched_snapshot"
+  target_cog: "cognitive-router"
+  target_port: "conversation_snapshot"
+}
+
+wires {
+  source_cog: "conversation-intake"
+  source_port: "enriched_snapshot"
+  target_cog: "claim-extractor"
+  target_port: "conversation_snapshot"
+}
+
+# Intake snapshot also goes to Context Inhibitor for formality computation
+wires {
+  source_cog: "conversation-intake"
+  source_port: "enriched_snapshot"
+  target_cog: "context-inhibitor"
+  target_port: "conversation_snapshot"
+}
+
+# Router fans out to detectors
+wires {
+  source_cog: "cognitive-router"
+  source_port: "anchoring_snapshot"
+  target_cog: "anchoring-detector"
+  target_port: "conversation_snapshot"
+}
+
+wires {
+  source_cog: "cognitive-router"
+  source_port: "sunk_cost_snapshot"
+  target_cog: "sunk-cost-detector"
+  target_port: "conversation_snapshot"
+}
+
+wires {
+  source_cog: "cognitive-router"
+  source_port: "contradiction_snapshot"
+  target_cog: "contradiction-tracker"
+  target_port: "conversation_snapshot"
+}
+
+wires {
+  source_cog: "cognitive-router"
+  source_port: "scope_snapshot"
+  target_cog: "scope-guard"
+  target_port: "conversation_snapshot"
+}
+
+wires {
+  source_cog: "cognitive-router"
+  source_port: "calibration_snapshot"
+  target_cog: "confidence-calibrator"
+  target_port: "conversation_snapshot"
+}
+
+wires {
+  source_cog: "cognitive-router"
+  source_port: "decision_snapshot"
+  target_cog: "decision-ledger"
+  target_port: "conversation_snapshot"
+}
+
+# All detectors fan in assessments to Context Inhibitor (not directly to Aggregator)
+wires {
+  source_cog: "anchoring-detector"
+  source_port: "assessment"
+  target_cog: "context-inhibitor"
+  target_port: "assessments"
+}
+
+wires {
+  source_cog: "sunk-cost-detector"
+  source_port: "assessment"
+  target_cog: "context-inhibitor"
+  target_port: "assessments"
+}
+
+wires {
+  source_cog: "contradiction-tracker"
+  source_port: "assessment"
+  target_cog: "context-inhibitor"
+  target_port: "assessments"
+}
+
+wires {
+  source_cog: "scope-guard"
+  source_port: "assessment"
+  target_cog: "context-inhibitor"
+  target_port: "assessments"
+}
+
+wires {
+  source_cog: "confidence-calibrator"
+  source_port: "assessment"
+  target_cog: "context-inhibitor"
+  target_port: "assessments"
+}
+
+wires {
+  source_cog: "decision-ledger"
+  source_port: "assessment"
+  target_cog: "context-inhibitor"
+  target_port: "assessments"
+}
+
+# Context Inhibitor gates findings to Aggregator
+wires {
+  source_cog: "context-inhibitor"
+  source_port: "gated_assessments"
+  target_cog: "synthesis-aggregator"
+  target_port: "assessment"
+}
+
+# Aggregator report back to Gateway
+wires {
+  source_cog: "synthesis-aggregator"
+  source_port: "report"
+  target_cog: "cognitive-gateway"
+  target_port: "report"
+}
+
+status: VALID
+
+description: "CORTEX Phase 1 cognitive pipeline — Gateway → Intake → Router → [6 detectors] → Context Inhibitor → Aggregator. Inhibitor gates findings through 5-gate basal ganglia cascade before aggregation."

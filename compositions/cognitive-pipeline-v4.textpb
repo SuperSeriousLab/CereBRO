@@ -1,0 +1,240 @@
+# Cognitive Pipeline v4 — CORTEX Phase 2 composition.
+# Gateway → Intake → Urgency Assessor → Router → Threshold Modulator →
+# [6 detectors] → Context Inhibitor → Aggregator
+# Phase 2 adds neuromodulation: Urgency Assessor produces GainSignal,
+# Threshold Modulator adjusts detector thresholds, Inhibitor receives
+# real urgency/formality from GainSignal (replaces Phase 1 stubs).
+
+name: "cognitive-pipeline-v4"
+version: "0.1.0"
+
+cogs {
+  name: "cognitive-gateway"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "conversation-intake"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "claim-extractor"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "urgency-assessor"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "cognitive-router"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "threshold-modulator"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "anchoring-detector"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "sunk-cost-detector"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "contradiction-tracker"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "scope-guard"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "confidence-calibrator"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "decision-ledger"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "context-inhibitor"
+  version: "0.1.0"
+}
+
+cogs {
+  name: "synthesis-aggregator"
+  version: "0.1.0"
+}
+
+# Gateway emits snapshot into pipeline
+wires {
+  source_cog: "cognitive-gateway"
+  source_port: "conversation_snapshot"
+  target_cog: "conversation-intake"
+  target_port: "conversation_snapshot"
+}
+
+# Intake enriches and sends to Router, Claim Extractor, Urgency Assessor, and Inhibitor
+wires {
+  source_cog: "conversation-intake"
+  source_port: "enriched_snapshot"
+  target_cog: "cognitive-router"
+  target_port: "conversation_snapshot"
+}
+
+wires {
+  source_cog: "conversation-intake"
+  source_port: "enriched_snapshot"
+  target_cog: "claim-extractor"
+  target_port: "conversation_snapshot"
+}
+
+# Stage 1.5: Urgency Assessor receives enriched snapshot
+wires {
+  source_cog: "conversation-intake"
+  source_port: "enriched_snapshot"
+  target_cog: "urgency-assessor"
+  target_port: "conversation_snapshot"
+}
+
+# Urgency Assessor emits GainSignal to Threshold Modulator
+wires {
+  source_cog: "urgency-assessor"
+  source_port: "gain_signal"
+  target_cog: "threshold-modulator"
+  target_port: "gain_signal"
+}
+
+# Urgency Assessor also sends GainSignal to Context Inhibitor (real urgency/formality)
+wires {
+  source_cog: "urgency-assessor"
+  source_port: "gain_signal"
+  target_cog: "context-inhibitor"
+  target_port: "gain_signal"
+}
+
+# Intake snapshot also goes to Context Inhibitor for turn text access
+wires {
+  source_cog: "conversation-intake"
+  source_port: "enriched_snapshot"
+  target_cog: "context-inhibitor"
+  target_port: "conversation_snapshot"
+}
+
+# Router fans out to detectors
+wires {
+  source_cog: "cognitive-router"
+  source_port: "anchoring_snapshot"
+  target_cog: "anchoring-detector"
+  target_port: "conversation_snapshot"
+}
+
+wires {
+  source_cog: "cognitive-router"
+  source_port: "sunk_cost_snapshot"
+  target_cog: "sunk-cost-detector"
+  target_port: "conversation_snapshot"
+}
+
+wires {
+  source_cog: "cognitive-router"
+  source_port: "contradiction_snapshot"
+  target_cog: "contradiction-tracker"
+  target_port: "conversation_snapshot"
+}
+
+wires {
+  source_cog: "cognitive-router"
+  source_port: "scope_snapshot"
+  target_cog: "scope-guard"
+  target_port: "conversation_snapshot"
+}
+
+wires {
+  source_cog: "cognitive-router"
+  source_port: "calibration_snapshot"
+  target_cog: "confidence-calibrator"
+  target_port: "conversation_snapshot"
+}
+
+wires {
+  source_cog: "cognitive-router"
+  source_port: "decision_snapshot"
+  target_cog: "decision-ledger"
+  target_port: "conversation_snapshot"
+}
+
+# All detectors fan in assessments to Context Inhibitor (not directly to Aggregator)
+wires {
+  source_cog: "anchoring-detector"
+  source_port: "assessment"
+  target_cog: "context-inhibitor"
+  target_port: "assessments"
+}
+
+wires {
+  source_cog: "sunk-cost-detector"
+  source_port: "assessment"
+  target_cog: "context-inhibitor"
+  target_port: "assessments"
+}
+
+wires {
+  source_cog: "contradiction-tracker"
+  source_port: "assessment"
+  target_cog: "context-inhibitor"
+  target_port: "assessments"
+}
+
+wires {
+  source_cog: "scope-guard"
+  source_port: "assessment"
+  target_cog: "context-inhibitor"
+  target_port: "assessments"
+}
+
+wires {
+  source_cog: "confidence-calibrator"
+  source_port: "assessment"
+  target_cog: "context-inhibitor"
+  target_port: "assessments"
+}
+
+wires {
+  source_cog: "decision-ledger"
+  source_port: "assessment"
+  target_cog: "context-inhibitor"
+  target_port: "assessments"
+}
+
+# Context Inhibitor gates findings to Aggregator
+wires {
+  source_cog: "context-inhibitor"
+  source_port: "gated_assessments"
+  target_cog: "synthesis-aggregator"
+  target_port: "assessment"
+}
+
+# Aggregator report back to Gateway
+wires {
+  source_cog: "synthesis-aggregator"
+  source_port: "report"
+  target_cog: "cognitive-gateway"
+  target_port: "report"
+}
+
+status: VALID
+
+description: "CORTEX Phase 2 cognitive pipeline — Gateway → Intake → Urgency Assessor → Router → Threshold Modulator → [6 detectors] → Context Inhibitor → Aggregator. Neuromodulation: GainSignal adjusts detector thresholds and feeds real urgency/formality to Inhibitor."

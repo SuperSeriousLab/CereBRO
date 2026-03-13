@@ -1,0 +1,90 @@
+# GEARS Toxicity Gate — Default Blocklist
+# One term per line. Word-boundary matching is applied automatically.
+# Lines starting with # are comments. Blank lines are ignored.
+#
+# NOTE: Technical terms that overlap with programming contexts are
+# intentionally EXCLUDED (kill, abort, master, slave, execute,
+# terminate, hang, fork, daemon, etc.)
+#
+# Categories: slurs, threats, hate speech, dehumanization, harassment
+
+# --- Racial/ethnic slurs ---
+chink
+gook
+kike
+spic
+wetback
+beaner
+raghead
+towelhead
+camel jockey
+jungle bunny
+coon
+darkie
+redskin
+halfbreed
+zipperhead
+gringo
+
+# --- Homophobic/transphobic slurs ---
+fag
+faggot
+dyke
+tranny
+shemale
+homo
+
+# --- Misogynistic slurs ---
+bitch
+cunt
+whore
+slut
+skank
+harlot
+
+# --- Ableist slurs ---
+retard
+retarded
+spaz
+cripple
+
+# --- Threats and violence ---
+kill yourself
+i will kill you
+gonna kill you
+i will hurt you
+gonna hurt you
+i will find you
+death threat
+bomb threat
+shoot you
+stab you
+rape you
+burn you alive
+
+# --- Hate speech phrases ---
+ethnic cleansing
+white power
+white supremacy
+heil hitler
+gas the
+death to all
+subhuman
+untermensch
+
+# --- Dehumanization ---
+vermin
+cockroach
+parasite
+filth
+scum of the earth
+worthless piece
+
+# --- Harassment ---
+go die
+drink bleach
+neck yourself
+end yourself
+nobody loves you
+everyone hates you
+you deserve to die

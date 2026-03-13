@@ -1,0 +1,63 @@
+# Toxicity Gate COG manifest.
+# PURE deterministic — blocklist-based toxicity screening.
+# CORTEX Phase 3 — Layer 0 (Brainstem Reflexes).
+
+name: "toxicity-gate"
+version: "0.1.0"
+language: GO
+determinism: PURE
+
+ports {
+  name: "conversation_snapshot"
+  direction: IN
+  message_type: "cog.reasoning.v1.ConversationSnapshot"
+}
+
+ports {
+  name: "toxicity_result"
+  direction: OUT
+  message_type: "cortex.v1.ToxicityResult"
+}
+
+ports {
+  name: "_error"
+  direction: OUT
+  message_type: "cog.core.v1.ErrorEvent"
+}
+
+contracts {
+  packages: "cog.reasoning.v1"
+  packages: "cortex.v1"
+  packages: "cog.core.v1"
+  proto_hash: "sha256:pending"
+}
+
+config {
+  fields {
+    name: "blocklist_path"
+    type: STRING
+    default_value: "data/blocklists/default.txt"
+    required: false
+    description: "Path to blocklist file (one term per line)"
+    evolvable: false
+  }
+  fields {
+    name: "case_sensitive"
+    type: BOOL
+    default_value: "false"
+    required: false
+    description: "If true, matching is case-sensitive"
+    evolvable: false
+  }
+}
+
+description: "Fast keyword/pattern blocklist screening with word boundary checking"
+
+tags: "cognitive"
+tags: "cortex"
+tags: "layer0"
+tags: "pure"
+
+lineage {
+  level: HAND_WRITTEN
+}

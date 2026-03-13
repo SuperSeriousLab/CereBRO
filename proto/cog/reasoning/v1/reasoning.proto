@@ -1,0 +1,283 @@
+// Cognitive Reasoning Contracts v1
+//
+// Domain message types for the deterministic cognitive augmentation layer.
+// These define the shared vocabulary between cognitive COGs — the data shapes
+// that flow through the reasoning pipeline.
+//
+// Separation of concerns:
+//   gears-contracts  → infrastructure (manifests, governance, Forge)
+//   cog-contracts    → domain (this file, plus Envelope, ConfigPatch, etc.)
+//
+// These types are designed to support both PURE and HYBRID cognitive COGs.
+// PURE COGs operate on the structured fields directly. HYBRID COGs receive
+// their input from the Claim Extractor (I-1), which is the single point of
+// LLM dependency in the pipeline.
+
+syntax = "proto3";
+
+package cog.reasoning.v1;
+
+option go_package = "github.com/SuperSeriousLab/CereBRO/gen/go/cog/reasoning/v1;reasoningv1";
+
+import "google/protobuf/timestamp.proto";
+
+
+// =============================================================================
+// Enums
+// =============================================================================
+
+// How a claim's truth status was established.
+enum EpistemicStatus {
+  EPISTEMIC_STATUS_UNSPECIFIED = 0;
+  GIVEN = 1;            // stated as a premise, not derived
+  EVIDENCED = 2;        // supported by cited evidence
+  INFERRED = 3;         // derived from other claims
+  SPECULATED = 4;       // explicitly hedged or hypothetical
+  ASSUMED = 5;          // unstated premise identified by analysis
+  RETRACTED = 6;        // explicitly withdrawn
+}
+
+// Severity of a cognitive finding.
+enum FindingSeverity {
+  FINDING_SEVERITY_UNSPECIFIED = 0;
+  INFO = 1;             // noteworthy but not problematic
+  CAUTION = 2;          // potential issue, warrants attention
+  WARNING = 3;          // likely reasoning failure
+  CRITICAL = 4;         // definite reasoning failure, high impact
+}
+
+// Type of cognitive finding — which failure mode was detected.
+enum FindingType {
+  FINDING_TYPE_UNSPECIFIED = 0;
+
+  // Formal reasoning
+  CONTRADICTION = 1;
+  CIRCULAR_REASONING = 2;
+  INVALID_SYLLOGISM = 3;
+  UNSUPPORTED_CONCLUSION = 4;
+
+  // Cognitive bias
+  ANCHORING_BIAS = 10;
+  SUNK_COST_FALLACY = 11;
+  STATUS_QUO_BIAS = 12;
+  ORDER_BIAS = 13;
+
+  // Epistemic hygiene
+  CONFIDENCE_MISCALIBRATION = 20;
+  ASSUMPTION_UNACKNOWLEDGED = 21;
+  EVIDENCE_QUALITY_LOW = 22;
+  PROVENANCE_MISSING = 23;
+
+  // Metacognitive
+  SCOPE_DRIFT = 30;
+  SILENT_REVISION = 31;
+  VOLATILITY_WITHOUT_WARRANT = 32;
+
+  // Discourse
+  ENTITY_COHERENCE_BREAK = 40;
+  SYCOPHANCY = 41;
+  FALSE_DICHOTOMY = 42;
+
+  // 100+ reserved for Forge-discovered finding types
+}
+
+// Confidence level expressed in natural language (mapped from text).
+enum ConfidenceLevel {
+  CONFIDENCE_LEVEL_UNSPECIFIED = 0;
+  CERTAIN = 1;          // "I'm sure", "definitely", "certainly"
+  LIKELY = 2;           // "probably", "I think", "likely"
+  POSSIBLE = 3;         // "maybe", "could be", "possibly"
+  SPECULATIVE = 4;      // "perhaps", "I wonder", "hypothetically"
+  UNKNOWN = 5;          // no confidence marker detected
+}
+
+
+// =============================================================================
+// Conversation representation
+// =============================================================================
+
+// A single turn in a conversation.
+message Turn {
+  uint32 turn_number = 1;                   // 1-indexed sequential position
+  string speaker = 2;                       // "user", "assistant", or identifier
+  string raw_text = 3;                      // original text of the turn
+  google.protobuf.Timestamp timestamp = 4;
+  TurnMetadata metadata = 5;
+  // 6-9 reserved
+}
+
+// Mechanical metadata extracted from a turn (PURE — no LLM needed).
+message TurnMetadata {
+  repeated string topic_keywords = 1;       // extracted via mechanical tokenization
+  repeated NumericToken numeric_tokens = 2; // all numbers with context
+  repeated string entity_mentions = 3;      // proper nouns, capitalized phrases
+  uint32 word_count = 4;
+  // 5-9 reserved
+}
+
+// A number found in text, with minimal positional context.
+message NumericToken {
+  double value = 1;
+  uint32 position = 2;                      // character offset in raw_text
+  string context_window = 3;               // surrounding ~10 words
+}
+
+// A snapshot of the conversation at a point in time.
+// This is the primary input to most cognitive COGs.
+message ConversationSnapshot {
+  repeated Turn turns = 1;
+  string objective = 2;                     // the original question or goal
+  repeated string objective_keywords = 3;   // tokenized from objective
+  uint32 total_turns = 4;
+  // 5-9 reserved
+}
+
+
+// =============================================================================
+// Claim and argument structures (output of Claim Extractor)
+// =============================================================================
+
+// An extracted proposition from the conversation.
+message Claim {
+  string claim_id = 1;                      // unique within conversation
+  uint32 source_turn = 2;                   // which turn this came from
+  string speaker = 3;
+  string text = 4;                          // the claim as extracted text
+  EpistemicStatus epistemic_status = 5;
+  ConfidenceLevel expressed_confidence = 6;
+  repeated string evidence_refs = 7;        // claim_ids that support this
+  repeated string depends_on = 8;           // claim_ids this assumes
+  // 9 reserved
+  repeated string entity_refs = 10;         // entities mentioned in claim
+}
+
+// Type of inferential relationship between claims.
+enum InferenceRelation {
+  INFERENCE_RELATION_UNSPECIFIED = 0;
+  SUPPORTS = 1;
+  CONTRADICTS = 2;
+  REFINES = 3;
+  QUALIFIES = 4;       // adds a condition or limitation
+  EXEMPLIFIES = 5;     // provides an instance of a general claim
+}
+
+// An inferential relationship between claims.
+message InferenceEdge {
+  string from_claim = 1;                    // premise claim_id
+  string to_claim = 2;                      // conclusion claim_id
+  InferenceRelation relation = 3;
+  double strength = 4;                      // 0.0–1.0, extraction confidence
+}
+
+// The full argument structure of a conversation — a directed graph.
+// Shared input type for Assumption Surfacer, Circular Reasoning Detector,
+// and Dependency Mapper.
+message ArgumentStructure {
+  repeated Claim claims = 1;
+  repeated InferenceEdge edges = 2;
+  string conversation_id = 3;
+  // 4-9 reserved
+}
+
+
+// =============================================================================
+// Decision tracking
+// =============================================================================
+
+// A decision point identified in the conversation.
+message DecisionEvent {
+  string decision_id = 1;
+  uint32 source_turn = 2;
+  string description = 3;                   // what was decided
+  string chosen_option = 4;
+  repeated string considered_alternatives = 5;
+  string stated_rationale = 6;
+  repeated string evidence_refs = 7;        // claim_ids supporting the decision
+  // 8-9 reserved
+}
+
+
+// =============================================================================
+// Cognitive assessments (output of cognitive COGs)
+// =============================================================================
+
+// A single finding from a cognitive COG.
+message CognitiveAssessment {
+  FindingType finding_type = 1;
+  FindingSeverity severity = 2;
+  string explanation = 3;                   // human-readable description
+  repeated string relevant_claims = 4;      // claim_ids involved
+  repeated uint32 relevant_turns = 5;       // turn numbers involved
+  double confidence = 6;                    // detector's confidence in this finding
+  string detector_name = 7;                 // which COG produced this
+  // 8-9 reserved
+
+  // Anchoring-specific (populated only for ANCHORING_BIAS findings)
+  AnchoringDetail anchoring = 10;
+  // Sunk-cost-specific
+  SunkCostDetail sunk_cost = 11;
+  // Contradiction-specific
+  ContradictionDetail contradiction = 12;
+  // Calibration-specific
+  CalibrationDetail calibration = 13;
+  // Scope-specific
+  ScopeDetail scope = 14;
+  // 15-19 reserved for additional finding-specific details
+}
+
+// Detail sub-messages for specific finding types.
+// These are optional extensions — only the relevant one is populated.
+
+message AnchoringDetail {
+  double anchor_value = 1;
+  double estimate_value = 2;
+  double relative_shift = 3;               // Δ = |estimate - baseline| / |anchor|
+  uint32 anchor_turn = 4;
+  uint32 estimate_turn = 5;
+}
+
+message SunkCostDetail {
+  string cost_reference = 1;               // the "already invested" phrase
+  uint32 cost_turn = 2;
+  string continuation_decision = 3;
+  uint32 decision_turn = 4;
+}
+
+message ContradictionDetail {
+  string claim_a_id = 1;
+  string claim_b_id = 2;
+  string claim_a_text = 3;
+  string claim_b_text = 4;
+}
+
+message CalibrationDetail {
+  double expected_calibration_error = 1;    // ECE score
+  ConfidenceLevel expressed = 2;
+  EpistemicStatus actual_warrant = 3;
+}
+
+message ScopeDetail {
+  double drift_distance = 1;               // fuzzy distance from objective
+  repeated string current_topics = 2;
+  repeated string objective_topics = 3;
+}
+
+
+// =============================================================================
+// Reasoning report (output of Synthesis Aggregator)
+// =============================================================================
+
+// The synthesized output of the full cognitive pipeline.
+message ReasoningReport {
+  repeated CognitiveAssessment findings = 1;   // all findings, priority-ordered
+  double overall_integrity_score = 2;           // 0.0–1.0
+  uint32 critical_count = 3;
+  uint32 warning_count = 4;
+  uint32 caution_count = 5;
+  repeated string recommended_actions = 6;      // human-readable suggestions
+  string conversation_id = 7;
+  google.protobuf.Timestamp assessed_at = 8;
+  repeated string detectors_activated = 9;      // which COGs were routed to
+  // 10-14 reserved
+  uint32 detectors_timed_out = 15;             // partial report indicator
+}

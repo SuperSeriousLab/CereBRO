@@ -1,0 +1,78 @@
+# Urgency Assessor COG manifest.
+# PURE deterministic — keyword-based urgency, complexity, formality analysis.
+# Produces GainSignal (neuromodulatory context) for threshold modulation.
+# CORTEX Phase 2 — Layer 2 (Gain Modulation).
+
+name: "urgency-assessor"
+version: "0.1.0"
+language: GO
+determinism: PURE
+
+ports {
+  name: "conversation_snapshot"
+  direction: IN
+  message_type: "cog.reasoning.v1.ConversationSnapshot"
+}
+
+ports {
+  name: "gain_signal"
+  direction: OUT
+  message_type: "cortex.v1.GainSignal"
+}
+
+ports {
+  name: "_error"
+  direction: OUT
+  message_type: "cog.core.v1.ErrorEvent"
+}
+
+contracts {
+  packages: "cog.reasoning.v1"
+  packages: "cortex.v1"
+  packages: "cog.core.v1"
+  proto_hash: "sha256:pending"
+}
+
+config {
+  fields {
+    name: "phasic_urgency_threshold"
+    type: DOUBLE
+    default_value: "0.6"
+    required: false
+    description: "Urgency above this triggers PHASIC mode (0.0-1.0)"
+    min_value: "0.0"
+    max_value: "1.0"
+    evolvable: true
+  }
+  fields {
+    name: "complexity_turn_threshold"
+    type: UINT32
+    default_value: "10"
+    required: false
+    description: "Turn count above which complexity score increases significantly"
+    min_value: "1"
+    max_value: "100"
+    evolvable: true
+  }
+  fields {
+    name: "recent_turn_window"
+    type: UINT32
+    default_value: "5"
+    required: false
+    description: "Number of recent turns scanned for urgency keywords"
+    min_value: "1"
+    max_value: "50"
+    evolvable: true
+  }
+}
+
+description: "Keyword-based urgency, complexity, and formality assessor — produces GainSignal for threshold modulation across all detectors"
+
+tags: "cognitive"
+tags: "cortex"
+tags: "neuromodulation"
+tags: "pure"
+
+lineage {
+  level: HAND_WRITTEN
+}

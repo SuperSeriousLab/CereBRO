@@ -1,0 +1,86 @@
+# Threshold Modulator COG manifest.
+# PURE deterministic — translates GainSignal into per-detector threshold offsets.
+# CORTEX Phase 2 — Layer 2 (Gain Modulation).
+
+name: "threshold-modulator"
+version: "0.1.0"
+language: GO
+determinism: PURE
+
+ports {
+  name: "gain_signal"
+  direction: IN
+  message_type: "cortex.v1.GainSignal"
+}
+
+ports {
+  name: "threshold_adjustments"
+  direction: OUT
+  message_type: "cortex.v1.ThresholdAdjustments"
+}
+
+ports {
+  name: "_error"
+  direction: OUT
+  message_type: "cog.core.v1.ErrorEvent"
+}
+
+contracts {
+  packages: "cortex.v1"
+  packages: "cog.core.v1"
+  proto_hash: "sha256:pending"
+}
+
+config {
+  fields {
+    name: "max_gain_offset"
+    type: DOUBLE
+    default_value: "0.15"
+    required: false
+    description: "Maximum absolute gain offset applied to any detector threshold (0.0-1.0)"
+    min_value: "0.0"
+    max_value: "1.0"
+    evolvable: true
+  }
+  fields {
+    name: "urgency_weight"
+    type: DOUBLE
+    default_value: "0.6"
+    required: false
+    description: "Weight of urgency in the gain formula (negative contribution)"
+    min_value: "0.0"
+    max_value: "1.0"
+    evolvable: true
+  }
+  fields {
+    name: "formality_weight"
+    type: DOUBLE
+    default_value: "0.3"
+    required: false
+    description: "Weight of inverse formality in the gain formula (positive contribution)"
+    min_value: "0.0"
+    max_value: "1.0"
+    evolvable: true
+  }
+  fields {
+    name: "complexity_weight"
+    type: DOUBLE
+    default_value: "0.1"
+    required: false
+    description: "Weight of complexity in the gain formula (negative contribution)"
+    min_value: "0.0"
+    max_value: "1.0"
+    evolvable: true
+  }
+}
+
+description: "Translates GainSignal into per-detector threshold adjustments — high urgency lowers thresholds (more sensitive), low formality raises thresholds (less sensitive)"
+
+tags: "cognitive"
+tags: "cortex"
+tags: "neuromodulation"
+tags: "pure"
+
+lineage {
+  level: HAND_WRITTEN
+}

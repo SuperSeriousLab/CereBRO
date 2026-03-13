@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+echo "=== CereBRO Orientation ==="
+echo ""
+echo "--- Repo Structure ---"
+find . -maxdepth 3 -type f -name "*.go" ! -path "./gen/*" | sort | head -30
+echo "..."
+echo ""
+echo "--- Build Status ---"
+go build ./... 2>&1 && echo "BUILD: OK" || echo "BUILD: FAILED"
+echo ""
+echo "--- Test Status ---"
+go test ./internal/pipeline/ -count=1 -short 2>&1 | tail -5
+echo ""
+echo "--- Proto Status ---"
+ls proto/*/v1/*.proto 2>/dev/null || echo "No protos found"
+echo ""
+echo "--- Corpus ---"
+wc -l data/corpus/*.ndjson 2>/dev/null || echo "No corpus files"
+echo ""
+echo "--- Test Conversations ---"
+ls data/test-conversations/*.ndjson 2>/dev/null | wc -l | xargs -I{} echo "{} test conversations"
+echo ""
+echo "--- Current Composition ---"
+ls compositions/*.textpb 2>/dev/null || echo "No compositions"
+echo ""
+echo "--- What's Next ---"
+echo "See docs/BUILD_ORDER.md for implementation phases"
+echo "All 6 CORTEX phases complete. CereBRO is standalone."

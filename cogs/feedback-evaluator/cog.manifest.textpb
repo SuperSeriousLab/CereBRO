@@ -1,0 +1,96 @@
+# Feedback Evaluator COG manifest.
+# PURE deterministic — re-evaluates low-confidence findings via feedback loop.
+# Checks self-confidence report and selectively re-runs detectors on weak findings.
+# CORTEX Phase 2 — Layer 5 (Feedback).
+
+name: "feedback-evaluator"
+version: "0.1.0"
+language: GO
+determinism: PURE
+
+ports {
+  name: "findings"
+  direction: IN
+  message_type: "cog.reasoning.v1.CognitiveAssessment"
+}
+
+ports {
+  name: "self_confidence"
+  direction: IN
+  message_type: "cortex.v1.SelfConfidenceReport"
+}
+
+ports {
+  name: "conversation_snapshot"
+  direction: IN
+  message_type: "cog.reasoning.v1.ConversationSnapshot"
+}
+
+ports {
+  name: "reasoning_report"
+  direction: IN
+  message_type: "cog.reasoning.v1.ReasoningReport"
+}
+
+ports {
+  name: "feedback_result"
+  direction: OUT
+  message_type: "string"
+}
+
+ports {
+  name: "_error"
+  direction: OUT
+  message_type: "cog.core.v1.ErrorEvent"
+}
+
+contracts {
+  packages: "cog.reasoning.v1"
+  packages: "cortex.v1"
+  packages: "cog.core.v1"
+  proto_hash: "sha256:pending"
+}
+
+config {
+  fields {
+    name: "feedback_threshold"
+    type: DOUBLE
+    default_value: "0.6"
+    required: false
+    description: "Below this self-confidence, feedback loop triggers (0.0-1.0)"
+    min_value: "0.0"
+    max_value: "1.0"
+    evolvable: true
+  }
+  fields {
+    name: "max_reeval_findings"
+    type: UINT32
+    default_value: "3"
+    required: false
+    description: "Maximum number of low-confidence findings to re-evaluate per cycle"
+    min_value: "1"
+    max_value: "20"
+    evolvable: true
+  }
+  fields {
+    name: "confidence_improvement_min"
+    type: DOUBLE
+    default_value: "0.1"
+    required: false
+    description: "Minimum confidence improvement for a re-evaluation to count (0.0-1.0)"
+    min_value: "0.0"
+    max_value: "1.0"
+    evolvable: true
+  }
+}
+
+description: "Re-evaluates low-confidence findings when self-confidence is below threshold, selectively re-running detectors to improve or confirm weak findings"
+
+tags: "cognitive"
+tags: "cortex"
+tags: "feedback"
+tags: "pure"
+
+lineage {
+  level: HAND_WRITTEN
+}
