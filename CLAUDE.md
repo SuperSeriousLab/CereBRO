@@ -75,7 +75,7 @@ cerebro/
 ├── scripts/
 │   ├── protogen.sh                     # Proto → Go codegen
 │   └── cerebro-orient                  # Session orientation
-└── cmd/cerebro/main.go                 # Minimal CLI entry point
+└── cogs/                               # Standalone COG binaries (format-validator, toxicity-gate, etc.)
 ```
 
 ## Architecture Rules
