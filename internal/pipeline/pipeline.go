@@ -13,6 +13,7 @@ type PipelineConfig struct {
 	Anchoring           AnchoringConfig
 	AnchoringContext    AnchoringContextConfig // context-aware variant (competition winner)
 	UseContextAnchoring bool                   // if true, use context-aware anchoring detector
+	SkipAnchoring       bool                   // if true, anchoring detector is omitted entirely (set by domain wiring)
 	SunkCost            SunkCostConfig
 	Contradiction       ContradictionConfig
 	ScopeGuard          ScopeGuardConfig
@@ -34,6 +35,8 @@ type PipelineConfig struct {
 	MLEnricher          MLEnricherConfig     // ML Enricher configuration (Ollama)
 	MLClient            *http.Client         // HTTP client for ML enricher (nil = use default)
 	MLEnrichment        *cerebrov1.MLEnrichment // populated at runtime by Stage 1.3 (merged view)
+	DomainContext       *DomainContext           // optional domain hint from upstream (e.g. Sophrim); nil = defaults
+	ConceptualAnchoring ConceptualAnchoringConfig // Tier 2: conceptual anchoring detector
 }
 
 // DefaultPipelineConfig returns all-default detector configurations.
@@ -51,6 +54,7 @@ func DefaultPipelineConfig() PipelineConfig {
 		Ledger:              DefaultLedgerConfig(),
 		SelfConfidence:      DefaultSelfConfidenceConfig(),
 		Feedback:            DefaultFeedbackConfig(),
+		ConceptualAnchoring: DefaultConceptualAnchoringConfig(),
 	}
 }
 
@@ -130,6 +134,11 @@ func Run(snap *reasoningv1.ConversationSnapshot, cfg PipelineConfig) *PipelineRe
 		// Apply gain offsets to detector configs
 		cfg = applyGainOffsets(cfg, adjustments)
 	}
+
+	// Domain context wiring: adjust detector configs for classical text (Sophrim hint).
+	// Must run after gain offsets (which adjust thresholds) so domain overrides win.
+	// Must run before buildDetectorMap so SkipAnchoring and config fields are visible.
+	cfg = applyDomainContext(cfg)
 
 	// Stage 2: Router — determine which detectors to activate
 	routing := Route(snap, cfg.Router)
@@ -324,18 +333,29 @@ func buildDetectorMap(cfg PipelineConfig) map[Detector]DetectorFunc {
 			return DetectSilentRevision(snap, cfg.Ledger)
 		},
 	}
-	if cfg.UseContextAnchoring {
-		m[DetectorAnchoring] = func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
-			if ml != nil {
-				return DetectAnchoringContextML(snap, cfg.AnchoringContext, ml)
+	// Anchoring: omit entirely when SkipAnchoring is set (e.g. classical domain context).
+	if !cfg.SkipAnchoring {
+		if cfg.UseContextAnchoring {
+			m[DetectorAnchoring] = func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
+				if ml != nil {
+					return DetectAnchoringContextML(snap, cfg.AnchoringContext, ml)
+				}
+				return DetectAnchoringContext(snap, cfg.AnchoringContext)
 			}
-			return DetectAnchoringContext(snap, cfg.AnchoringContext)
-		}
-	} else {
-		m[DetectorAnchoring] = func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
-			return DetectAnchoring(snap, cfg.Anchoring)
+		} else {
+			m[DetectorAnchoring] = func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
+				return DetectAnchoring(snap, cfg.Anchoring)
+			}
 		}
 	}
+
+	// Conceptual Anchoring: ALWAYS registered — not skipped by classical domain context.
+	// This is the propositional variant that fires on classical text where numeric
+	// anchoring is absent. cfg.SkipAnchoring only suppresses the numeric detector.
+	m[DetectorConceptualAnchoring] = func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
+		return DetectConceptualAnchoring(snap, cfg.ConceptualAnchoring)
+	}
+
 	return m
 }
 
