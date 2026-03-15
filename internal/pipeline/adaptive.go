@@ -1,0 +1,64 @@
+// Domain-adaptive pipeline variant selection.
+//
+// RunAdaptive selects the optimal pipeline variant based on domain context:
+//   - Classical text (era="classical", confidence>0.6) → E-pre-cortex (higher recall)
+//   - Everything else → D-inhibitor-only (higher precision, lower latency)
+//
+// This is the primary entry point for production use when the caller has
+// upstream domain signals (e.g. from Sophrim). The clean interface —
+// DomainContext in, PipelineResult out — lets any system that can produce a
+// DomainContext plug into domain-adaptive behaviour without knowing the
+// pipeline's internal architecture.
+package pipeline
+
+import (
+	"errors"
+
+	reasoningv1 "github.com/SuperSeriousLab/CereBRO/gen/go/cog/reasoning/v1"
+)
+
+// RunAdaptive selects the optimal pipeline variant based on domain context.
+//
+// Classical text (era="classical", confidence>0.6) → E-pre-cortex (higher recall).
+// Everything else → D-inhibitor-only (higher precision, lower latency).
+//
+// Domain selection logic:
+//   - nil domain  → D-inhibitor-only (safe default)
+//   - modern era  → D-inhibitor-only
+//   - classical, low confidence (≤0.6) → D-inhibitor-only
+//   - classical, confidence > 0.6      → E-pre-cortex
+//
+// The DomainContext is applied on top of the selected config so that
+// classical-text detector adjustments (ScopeGuard thresholds, SkipAnchoring,
+// Calibrator.MinCertaintyWords) are always in effect when pre-cortex runs on
+// classical text.
+func RunAdaptive(snap *reasoningv1.ConversationSnapshot, domain *DomainContext) (*PipelineResult, error) {
+	if snap == nil {
+		return nil, errors.New("RunAdaptive: snap must not be nil")
+	}
+
+	var cfg PipelineConfig
+	if domain.isClassical() {
+		// E-pre-cortex: detectors → aggregator unfiltered (higher recall on classical)
+		cfg = PreCortexConfig()
+	} else {
+		// D-inhibitor-only: detectors + inhibitor + aggregator (higher precision)
+		cfg = InhibitorOnlyConfig()
+	}
+
+	// Wire domain context so applyDomainContext inside Run can adjust
+	// detector thresholds for classical vocabulary characteristics.
+	cfg.DomainContext = domain
+
+	result := Run(snap, cfg)
+	return result, nil
+}
+
+// AdaptiveVariantName returns the name of the variant that RunAdaptive would
+// select for the given domain. Useful for logging and testing.
+func AdaptiveVariantName(domain *DomainContext) string {
+	if domain.isClassical() {
+		return PreCortexInfo().Name
+	}
+	return InhibitorOnlyInfo().Name
+}
