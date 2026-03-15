@@ -32,14 +32,17 @@ func (dc *DomainContext) isClassical() bool {
 //     correctly identifies genuine scope shifts (e.g. Thrasymachus's late-dialogue
 //     shift from justice-definition to political advantage) while staying above
 //     the within-topic vocabulary variation of philosophical dialogue.
-//   - ScopeGuard.SustainedTurns = 3  (default 8)
+//   - ScopeGuard.SustainedTurns = 4  (default 8; Forge Cycle 1 winner on full corpus)
 //     Classical corpus entries are segmented into ~10-turn windows. With a
 //     reference window of 4 turns, only ~6 turns are evaluated per entry.
 //     SustainedTurns=8 (tuned for 15-turn modern conversations) can never fire
-//     on 10-turn segments — mathematically impossible. Lowering to 3 preserves
-//     the "sustained drift" discriminator while matching the segment length.
-//     Three consecutive drifting turns is still a strong signal; single-turn
+//     on 10-turn segments — mathematically impossible. Forge Cycle 1 found 4 optimal
+//     on the full corpus (improves classical recall without harming modern F1).
+//     Four consecutive drifting turns is a strong sustained signal; single-turn
 //     vocabulary excursions (which are normal in classical dialogue) are not flagged.
+//   - ConceptualAnchoring.AnchorThreshold = 0.35  (default 0.30; Forge Cycle 1 winner)
+//     Raising the Jaccard overlap threshold to 0.35 reduces false positives on
+//     classical philosophical restatements while preserving genuine anchoring signals.
 //   - Calibrator.MinCertaintyWords = 8  (default 5)
 //     Classical discourse particles are longer.
 //   - Anchoring detector: removed from detector map via SkipAnchoring flag.
@@ -58,8 +61,12 @@ func applyDomainContext(cfg PipelineConfig) PipelineConfig {
 
 	// ScopeGuard: lower sustained-turns requirement to match segment length.
 	// Classical corpus entries are ~10 turns; default=8 cannot fire on these.
-	// Three consecutive drifting turns is a strong enough sustained signal.
-	cfg.ScopeGuard.SustainedTurns = 3
+	// Forge Cycle 1 found 4 optimal on full corpus (classical recall improvement).
+	cfg.ScopeGuard.SustainedTurns = 4
+
+	// ConceptualAnchoring: raise overlap threshold for classical philosophical
+	// restatements. Forge Cycle 1 winner: 0.35 reduces FP on within-topic repetition.
+	cfg.ConceptualAnchoring.AnchorThreshold = 0.35
 
 	// Calibrator: require longer turns before CERTAIN-level markers are counted.
 	cfg.Calibrator.MinCertaintyWords = 8

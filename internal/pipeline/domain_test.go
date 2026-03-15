@@ -153,8 +153,19 @@ func TestApplyDomainContext_classical_scopeGuardSustainedTurns(t *testing.T) {
 
 	out := applyDomainContext(cfg)
 
-	if out.ScopeGuard.SustainedTurns != 3 {
-		t.Errorf("classical domain: expected SustainedTurns=3, got %d", out.ScopeGuard.SustainedTurns)
+	if out.ScopeGuard.SustainedTurns != 4 {
+		t.Errorf("classical domain: expected SustainedTurns=4 (Forge Cycle 1 winner), got %d", out.ScopeGuard.SustainedTurns)
+	}
+}
+
+func TestApplyDomainContext_classical_anchorThreshold(t *testing.T) {
+	cfg := DefaultPipelineConfig()
+	cfg.DomainContext = &DomainContext{PrimaryDomain: "philosophy", TextEra: "classical", Confidence: 0.85}
+
+	out := applyDomainContext(cfg)
+
+	if out.ConceptualAnchoring.AnchorThreshold != 0.35 {
+		t.Errorf("classical domain: expected AnchorThreshold=0.35 (Forge Cycle 1 winner), got %.2f", out.ConceptualAnchoring.AnchorThreshold)
 	}
 }
 
@@ -234,8 +245,8 @@ func TestPipeline_classicalDomain_configFields(t *testing.T) {
 	if cfg.ScopeGuard.DriftThreshold != 0.70 {
 		t.Errorf("ScopeGuard.DriftThreshold: want 0.70, got %.2f", cfg.ScopeGuard.DriftThreshold)
 	}
-	if cfg.ScopeGuard.SustainedTurns != 3 {
-		t.Errorf("ScopeGuard.SustainedTurns: want 3, got %d", cfg.ScopeGuard.SustainedTurns)
+	if cfg.ScopeGuard.SustainedTurns != 4 {
+		t.Errorf("ScopeGuard.SustainedTurns: want 4, got %d", cfg.ScopeGuard.SustainedTurns)
 	}
 	if cfg.Calibrator.MinCertaintyWords != 8 {
 		t.Errorf("Calibrator.MinCertaintyWords: want 8, got %d", cfg.Calibrator.MinCertaintyWords)

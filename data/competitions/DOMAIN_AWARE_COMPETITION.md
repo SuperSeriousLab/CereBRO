@@ -9,7 +9,8 @@
 - **Modern entries:** `DomainContext = nil` — all pipeline defaults apply.
 - **Classical entries:** `DomainContext{TextEra:"classical", PrimaryDomain:"philosophy", Confidence:0.85}`
   - `ScopeGuard.DriftThreshold` = 0.70 (default 0.79)
-  - `ScopeGuard.SustainedTurns` = 3 (default 8)
+  - `ScopeGuard.SustainedTurns` = 4 (default 8; Forge Cycle 1 winner)
+  - `ConceptualAnchoring.AnchorThreshold` = 0.35 (default 0.30; Forge Cycle 1 winner)
   - `Calibrator.MinCertaintyWords` = 8 (default 5)
   - Anchoring detector: **skipped** (no numeric anchoring in classical text)
   - ConceptualAnchoring detector: **active** (propositional variant for classical text)
@@ -30,28 +31,28 @@
 
 | Variant | Precision | Recall | F1 | TP | FP | FN |
 |---------|-----------|--------|----|----|----|----|
-| A-full-cortex          | 0.419 | 0.361 | **0.388** | 26 | 36 | 46 |
-| B-no-feedback          | 0.419 | 0.361 | **0.388** | 26 | 36 | 46 |
-| C-no-modulation        | 0.419 | 0.361 | **0.388** | 26 | 36 | 46 |
-| D-inhibitor-only       | 0.419 | 0.361 | **0.388** | 26 | 36 | 46 |
-| E-pre-cortex           | 0.427 | 0.486 | **0.455** | 35 | 47 | 37 |
+| A-full-cortex          | 0.481 | 0.347 | **0.403** | 25 | 27 | 47 |
+| B-no-feedback          | 0.481 | 0.347 | **0.403** | 25 | 27 | 47 |
+| C-no-modulation        | 0.472 | 0.347 | **0.400** | 25 | 28 | 47 |
+| D-inhibitor-only       | 0.472 | 0.347 | **0.400** | 25 | 28 | 47 |
+| E-pre-cortex           | 0.446 | 0.458 | **0.452** | 33 | 41 | 39 |
 
 ### Combined Summary
 
 | Variant | Modern F1 | Classical F1 | Combined F1 | Latency(ms) | Stages |
 |---------|-----------|-------------|-------------|-------------|--------|
-| A-full-cortex          | 0.909 | 0.388 | **0.462** | 2.242 | 12 |
-| B-no-feedback          | 0.909 | 0.388 | **0.462** | 2.017 | 10 |
-| C-no-modulation        | 0.909 | 0.388 | **0.462** | 1.945 | 10 |
-| D-inhibitor-only       | 0.909 | 0.388 | **0.462** | 1.416 | 5 |
-| E-pre-cortex           | 0.800 | 0.455 | **0.503** | 1.766 | 4 |
+| A-full-cortex          | 0.909 | 0.403 | **0.479** | 1.960 | 12 |
+| B-no-feedback          | 0.909 | 0.403 | **0.479** | 1.868 | 10 |
+| C-no-modulation        | 0.909 | 0.400 | **0.476** | 1.868 | 10 |
+| D-inhibitor-only       | 0.909 | 0.400 | **0.476** | 1.357 | 5 |
+| E-pre-cortex           | 0.800 | 0.452 | **0.503** | 1.147 | 4 |
 
 ## Winners
 
 | Category | Winner | F1 |
 |----------|--------|----|
 | Modern   | A-full-cortex | 0.909 |
-| Classical | E-pre-cortex | 0.455 |
+| Classical | E-pre-cortex | 0.452 |
 | Combined | E-pre-cortex | 0.503 |
 
 ## Key Questions
@@ -62,15 +63,15 @@
 
 ### Q2: Does domain context change the winner on classical text?
 
-**YES** — Classical winner is **E-pre-cortex** (F1=0.455). D-inhibitor-only scores F1=0.388 on classical text.
+**YES** — Classical winner is **E-pre-cortex** (F1=0.452). D-inhibitor-only scores F1=0.400 on classical text.
 
 Domain adjustments (lower DriftThreshold, lower SustainedTurns, higher MinCertaintyWords,
 skip numeric anchoring, activate conceptual anchoring) shift the balance between variants.
 
 ### Q3: Does the full pipeline (A) outperform D on classical text?
 
-**NO** — A-full-cortex F1=0.388 vs D-inhibitor-only F1=0.388 on classical corpus.
-The extra layers do not improve over the minimal pipeline on this text.
+**YES** — A-full-cortex F1=0.403 vs D-inhibitor-only F1=0.400 on classical corpus.
+The extra layers (modulation, salience, metacognition) add value on classical text.
 
 ### Q4: Which variant wins on COMBINED (modern + classical)?
 
