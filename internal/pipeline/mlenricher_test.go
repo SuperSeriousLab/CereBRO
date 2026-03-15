@@ -340,6 +340,106 @@ func TestDetectorML_CalibrationBoost(t *testing.T) {
 	}
 }
 
+// TestDetectorML_CalibrationNoFalsePositive_HedgingOnly verifies that conversations
+// containing only normal hedging language (I think, maybe, probably) do NOT trigger
+// CONFIDENCE_MISCALIBRATION, even when the LLM extracts confidence_markers.
+// This is the calibration floor fix for the over-firing issue observed in the competition.
+func TestDetectorML_CalibrationNoFalsePositive_HedgingOnly(t *testing.T) {
+	// Clean conversation: hedging language only, no absolute certainty claims
+	snap := &reasoningv1.ConversationSnapshot{
+		Turns: []*reasoningv1.Turn{
+			{TurnNumber: 1, Speaker: "user", RawText: "I think we should probably explore this option. Maybe it will work."},
+			{TurnNumber: 2, Speaker: "assistant", RawText: "I believe that could be worth considering. It seems like a reasonable approach."},
+		},
+	}
+	snap = Enrich(snap)
+
+	cfg := DefaultCalibratorConfig()
+
+	// LLM extracted some confidence markers, but only hedging phrases
+	ml := &cerebrov1.MLEnrichment{
+		Claims: []*cerebrov1.MLClaim{
+			{Text: "explore this option", EpistemicStatus: "speculative", EvidenceRefs: nil},
+			{Text: "worth considering", EpistemicStatus: "likely", EvidenceRefs: nil},
+		},
+		ConfidenceMarkers: []string{"I think", "probably", "maybe", "I believe"},
+	}
+
+	pure := DetectConfidenceMiscalibration(snap, cfg)
+	if pure != nil {
+		t.Skip("PURE unexpectedly fired on this clean conversation")
+	}
+
+	enhanced := DetectConfidenceMiscalibrationML(snap, cfg, ml)
+	if enhanced != nil {
+		t.Errorf("ML should NOT fire on hedging-only conversation, got finding: %v", enhanced.GetExplanation())
+	}
+}
+
+// TestDetectorML_CalibrationNoFalsePositive_SingleCertainClaim verifies that a single
+// high-certainty claim without evidence does NOT trigger the ML-only path.
+// The calibration floor requires ≥2 certain claims to avoid false positives.
+func TestDetectorML_CalibrationNoFalsePositive_SingleCertainClaim(t *testing.T) {
+	snap := &reasoningv1.ConversationSnapshot{
+		Turns: []*reasoningv1.Turn{
+			{TurnNumber: 1, Speaker: "user", RawText: "We should take the left path."},
+		},
+	}
+	snap = Enrich(snap)
+
+	cfg := DefaultCalibratorConfig()
+
+	// Only one "certain" claim with no evidence — not enough to fire
+	ml := &cerebrov1.MLEnrichment{
+		Claims: []*cerebrov1.MLClaim{
+			{Text: "take the left path", EpistemicStatus: "certain", EvidenceRefs: nil},
+		},
+		ConfidenceMarkers: []string{"definitely", "absolutely", "certainly"},
+	}
+
+	pure := DetectConfidenceMiscalibration(snap, cfg)
+	if pure != nil {
+		t.Skip("PURE unexpectedly fired")
+	}
+
+	enhanced := DetectConfidenceMiscalibrationML(snap, cfg, ml)
+	if enhanced != nil {
+		t.Errorf("ML should NOT fire on single certain claim (requires ≥2), got: %v", enhanced.GetExplanation())
+	}
+}
+
+// TestDetectorML_CalibrationMLOnlyFires verifies the ML-only path DOES fire when
+// the calibration floor conditions are fully met: ≥2 certain claims + ≥3 high-certainty markers.
+func TestDetectorML_CalibrationMLOnlyFires(t *testing.T) {
+	snap := &reasoningv1.ConversationSnapshot{
+		Turns: []*reasoningv1.Turn{
+			{TurnNumber: 1, Speaker: "user", RawText: "This is a normal conversation turn."},
+		},
+	}
+	snap = Enrich(snap)
+
+	cfg := DefaultCalibratorConfig()
+
+	// Two certain claims with no evidence, plus 3 high-certainty markers
+	ml := &cerebrov1.MLEnrichment{
+		Claims: []*cerebrov1.MLClaim{
+			{Text: "plan A will succeed", EpistemicStatus: "certain", EvidenceRefs: nil},
+			{Text: "the market will recover", EpistemicStatus: "certain", EvidenceRefs: nil},
+		},
+		ConfidenceMarkers: []string{"absolutely", "definitely", "certainly", "I'm sure"},
+	}
+
+	pure := DetectConfidenceMiscalibration(snap, cfg)
+	if pure != nil {
+		t.Skip("PURE unexpectedly fired")
+	}
+
+	enhanced := DetectConfidenceMiscalibrationML(snap, cfg, ml)
+	if enhanced == nil {
+		t.Error("ML should fire when ≥2 certain claims and ≥3 high-certainty markers are present")
+	}
+}
+
 // TestAssessUrgencyML verifies ML formality blending.
 func TestAssessUrgencyML(t *testing.T) {
 	snap := &reasoningv1.ConversationSnapshot{

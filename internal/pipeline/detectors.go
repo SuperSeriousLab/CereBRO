@@ -709,31 +709,99 @@ var evidenceMarkers = []string{
 	"according to", "studies show",
 }
 
+// mlHedgingPhrases are common epistemic qualifiers that indicate calibrated uncertainty.
+// These are normal conversational hedges — their presence does NOT indicate miscalibration.
+var mlHedgingPhrases = []string{
+	"i think", "i believe", "i feel", "i suppose", "i guess",
+	"maybe", "perhaps", "possibly", "probably", "likely",
+	"not sure", "not certain", "uncertain", "unclear",
+	"it seems", "it appears", "it looks like",
+	"kind of", "sort of", "more or less",
+	"might", "could be", "may be",
+}
+
+// mlCertaintyMarkers are phrases that express absolute certainty — the kind that
+// signals genuine miscalibration when unsupported by evidence.
+var mlCertaintyMarkers = []string{
+	"absolutely", "definitely", "certainly", "undoubtedly", "unquestionably",
+	"without doubt", "without question", "100%", "guaranteed",
+	"i am certain", "i am sure", "i'm certain", "i'm sure",
+	"there is no doubt", "it is certain", "it is definite",
+	"always", "never", "impossible", "must be",
+}
+
+// countHighCertaintyMarkers counts confidence_markers that express absolute certainty,
+// excluding normal hedging language.
+func countHighCertaintyMarkers(markers []string) int {
+	count := 0
+	for _, m := range markers {
+		lower := strings.ToLower(strings.TrimSpace(m))
+		// Skip if this looks like a hedging phrase
+		isHedge := false
+		for _, hedge := range mlHedgingPhrases {
+			if strings.Contains(lower, hedge) {
+				isHedge = true
+				break
+			}
+		}
+		if isHedge {
+			continue
+		}
+		// Count if it matches a certainty marker
+		for _, certain := range mlCertaintyMarkers {
+			if strings.Contains(lower, certain) {
+				count++
+				break
+			}
+		}
+	}
+	return count
+}
+
+// certaintyEpistemicStatuses are epistemic_status values from the LLM that indicate
+// high-certainty claims which may be miscalibrated when paired with no evidence.
+var certaintyEpistemicStatuses = map[string]bool{
+	"certain":    true,
+	"definitive": true,
+	"absolute":   true,
+}
+
 // DetectConfidenceMiscalibrationML wraps DetectConfidenceMiscalibration with ML enrichment.
 // Uses ML confidence_markers and claim epistemic mismatches to refine detection.
+//
+// Calibration floor rules (ML-only path):
+//  1. Requires ≥2 high-certainty claims with no evidence (single hedges are normal conversation)
+//  2. Requires ≥3 high-certainty confidence markers (after excluding hedging phrases)
+//  3. Only fires on epistemic_status values that indicate certainty ("certain", "definitive", "absolute")
+//  4. The PURE detection path is unchanged — only the ML-only trigger is tightened
 func DetectConfidenceMiscalibrationML(snap *reasoningv1.ConversationSnapshot, cfg CalibratorConfig, ml *cerebrov1.MLEnrichment) *reasoningv1.CognitiveAssessment {
 	finding := DetectConfidenceMiscalibration(snap, cfg)
 	if ml == nil {
 		return finding
 	}
 
-	// Check ML claims for epistemic mismatches (e.g., "certain" claim with no evidence)
-	var mlMismatch bool
+	// Count ML claims with high-certainty epistemic status and no supporting evidence.
+	certainMismatchCount := 0
 	for _, claim := range ml.GetClaims() {
 		hasEvidence := len(claim.GetEvidenceRefs()) > 0
-		if claim.GetEpistemicStatus() == "certain" && !hasEvidence {
-			mlMismatch = true
-			break
+		if certaintyEpistemicStatuses[claim.GetEpistemicStatus()] && !hasEvidence {
+			certainMismatchCount++
 		}
 	}
 
-	if finding != nil && mlMismatch {
-		// ML corroborates — boost confidence
+	if finding != nil && certainMismatchCount >= 1 {
+		// PURE already found miscalibration and ML corroborates — boost confidence.
+		// A single high-certainty ungrounded claim is sufficient corroboration.
 		finding.Confidence = clamp(finding.Confidence+0.1, 0.0, 1.0)
 	}
 
-	// ML confidence markers can trigger if PURE missed
-	if finding == nil && mlMismatch && len(ml.GetConfidenceMarkers()) > 0 {
+	// ML-only trigger: PURE missed it, but ML signals potential miscalibration.
+	// Calibration floor: require both a strong epistemic-mismatch signal (≥2 high-certainty
+	// claims with no evidence) AND ≥3 high-certainty confidence markers after excluding
+	// normal hedging language ("I think", "maybe", "probably" etc.).
+	// This prevents ubiquitous hedging language from triggering false positives.
+	highCertaintyMarkerCount := countHighCertaintyMarkers(ml.GetConfidenceMarkers())
+	if finding == nil && certainMismatchCount >= 2 && highCertaintyMarkerCount >= 3 {
 		return &reasoningv1.CognitiveAssessment{
 			FindingType:  reasoningv1.FindingType_CONFIDENCE_MISCALIBRATION,
 			Severity:     reasoningv1.FindingSeverity_INFO,
