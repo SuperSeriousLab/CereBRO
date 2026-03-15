@@ -138,12 +138,15 @@ func PreCortexInfo() VariantInfo {
 }
 
 // MLEnrichedConfig returns Variant F: full pipeline with ML enrichment enabled.
-// Same as Variant A but with Ollama-based ML enrichment at Stage 1.3.
+// LLM calls are routed through the shared eidos-llm client (SLR → Grok → Ollama).
 // Stages: 0 → 1 → 1.3 → 1.5 → 2 → 2.5 → 3 → 4 → 4.5 → 5 → 6 → 7 → 8
 func MLEnrichedConfig() PipelineConfig {
 	cfg := FullCortexConfig()
 	cfg.MLEnricher = DefaultMLEnricherConfig()
 	cfg.MLEnricher.Enabled = true
+	// Wire the eidos-llm adapter as the default LLM caller.
+	// Routes through SLR → Grok → Ollama fallback chain.
+	cfg.MLEnricher.LLMCaller = NewEidosLLMCaller(DefaultEidosLLMConfig(), "auto")
 	return cfg
 }
 
@@ -151,7 +154,7 @@ func MLEnrichedConfig() PipelineConfig {
 func MLEnrichedInfo() VariantInfo {
 	return VariantInfo{
 		Name:        "F-ml-enriched",
-		Description: "Full pipeline with Ollama ML enrichment at Stage 1.3",
+		Description: "Full pipeline with eidos-llm ML enrichment at Stage 1.3 (SLR → Grok → Ollama)",
 		StageCount:  13, // 0,1,1.3,1.5,2,2.5,3,4,4.5,5,6,7,8
 		CogCount:    22,
 	}

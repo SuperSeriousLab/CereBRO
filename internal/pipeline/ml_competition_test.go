@@ -50,7 +50,7 @@ func TestMLCompetition(t *testing.T) {
 	mlConfig := InhibitorOnlyConfig()
 	mlConfig.MLEnricher = DefaultMLEnricherConfig()
 	mlConfig.MLEnricher.Enabled = true
-	mlConfig.MLEnricher.TimeoutPerTurn = 45 * time.Second // tight timeout; failures fallback to PURE
+	mlConfig.MLEnricher.TimeoutPerTurn = 90 * time.Second // generous timeout for 29.9B model; failures fallback to PURE
 
 	variants := []ArchVariant{
 		{pureConfig, InhibitorOnlyInfo()},

@@ -15,7 +15,14 @@ import (
 	reasoningv1 "github.com/SuperSeriousLab/CereBRO/gen/go/cog/reasoning/v1"
 )
 
-// MLEnricherConfig holds configuration for the Ollama-based ML enricher.
+// LLMCaller is the minimal interface for making a single LLM call.
+// Implementations include the direct Ollama path and the EidosLLMCaller adapter
+// (which routes through SLR → Grok → Ollama via the shared eidos-llm client).
+type LLMCaller interface {
+	Call(ctx context.Context, prompt string) (string, error)
+}
+
+// MLEnricherConfig holds configuration for the ML enricher.
 type MLEnricherConfig struct {
 	OllamaURL      string
 	Model          string
@@ -24,6 +31,10 @@ type MLEnricherConfig struct {
 	FallbackToPure bool
 	Temperature    float64
 	Enabled        bool
+	// LLMCaller overrides the default direct-Ollama path when non-nil.
+	// Set to an *EidosLLMCaller to route through the SLR → Grok → Ollama
+	// fallback chain provided by the shared eidos-llm library.
+	LLMCaller LLMCaller
 }
 
 // DefaultMLEnricherConfig returns the default ML enricher configuration.
@@ -130,7 +141,19 @@ func enrichTurn(turn *reasoningv1.Turn, snap *reasoningv1.ConversationSnapshot, 
 	var lastErr error
 	attempts := 1 + cfg.MaxRetries
 	for i := 0; i < attempts; i++ {
-		resp, err := callOllama(prompt, cfg, client)
+		var (
+			resp string
+			err  error
+		)
+		if cfg.LLMCaller != nil {
+			// Use the injected LLMCaller (e.g. EidosLLMCaller: SLR → Grok → Ollama).
+			ctx, cancel := context.WithTimeout(context.Background(), cfg.TimeoutPerTurn)
+			resp, err = cfg.LLMCaller.Call(ctx, prompt)
+			cancel()
+		} else {
+			// Legacy path: direct Ollama /api/chat call.
+			resp, err = callOllama(prompt, cfg, client)
+		}
 		if err != nil {
 			lastErr = err
 			continue
@@ -199,6 +222,16 @@ func callOllama(prompt string, cfg MLEnricherConfig, client *http.Client) (strin
 		return "", fmt.Errorf("marshal request: %w", err)
 	}
 
+	// Use a per-call client with hard timeout — context deadlines alone
+	// don't reliably cancel Ollama calls when the model's thinking mode
+	// keeps the connection alive with intermediate data.
+	callClient := &http.Client{Timeout: cfg.TimeoutPerTurn}
+	if client != nil && client != http.DefaultClient {
+		// Preserve transport from provided client (e.g., httptest)
+		callClient.Transport = client.Transport
+		callClient.Timeout = cfg.TimeoutPerTurn
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.TimeoutPerTurn)
 	defer cancel()
 
@@ -208,7 +241,7 @@ func callOllama(prompt string, cfg MLEnricherConfig, client *http.Client) (strin
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := client.Do(req)
+	resp, err := callClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("ollama call: %w", err)
 	}
