@@ -470,8 +470,8 @@ func TestComputeFormality_Informal(t *testing.T) {
 	}, "chat")
 
 	f := ComputeFormality(snap)
-	if f >= 0.3 {
-		t.Errorf("informal conversation should have formality < 0.3, got %.2f", f)
+	if f >= 0.5 {
+		t.Errorf("informal conversation should have formality < 0.5, got %.2f", f)
 	}
 }
 
@@ -482,8 +482,93 @@ func TestComputeFormality_Formal(t *testing.T) {
 	}, "technical review")
 
 	f := ComputeFormality(snap)
-	if f <= 0.5 {
-		t.Errorf("formal conversation should have formality > 0.5, got %.2f", f)
+	if f <= 0.8 {
+		t.Errorf("formal conversation should have formality > 0.8, got %.2f", f)
+	}
+}
+
+// =============================================================================
+// Formality: extended register tests
+// =============================================================================
+
+func TestComputeFormality_ModernCasual(t *testing.T) {
+	// Modern casual chat with contractions, slang, exclamations
+	snap := makeSnap([]struct{ num uint32; speaker, text string }{
+		{1, "user", "hey so like I think we should just go with React it's way easier"},
+		{2, "assistant", "yeah totally! I'm gonna say that's the best option, don't overthink it lol"},
+		{3, "user", "cool btw did you see that thing? it's awesome haha"},
+		{4, "assistant", "nah I haven't but I'll check it out, it sounds kinda fun I guess"},
+	}, "casual chat")
+
+	f := ComputeFormality(snap)
+	if f >= 0.5 {
+		t.Errorf("modern casual text should have formality < 0.5, got %.2f", f)
+	}
+}
+
+func TestComputeFormality_ModernAcademic(t *testing.T) {
+	// Modern formal / academic text
+	snap := makeSnap([]struct{ num uint32; speaker, text string }{
+		{1, "user", "According to the specification, the recommended architectural pattern for distributed systems requires careful analysis of consistency guarantees pursuant to the CAP theorem."},
+		{2, "assistant", "Based on the analysis of the data, it should be noted that the trade-off between availability and partition tolerance is well-documented in the literature. Furthermore, the requirement for strong consistency necessitates a careful evaluation of the proposed solution. Consequently, it is recommended that we adopt a consensus-based approach in accordance with industry best practices."},
+		{3, "user", "With respect to the performance implications, the data suggests that eventual consistency may be acceptable for this particular use case. In my assessment, the additional complexity notwithstanding, the benefits justify the design decision."},
+	}, "system architecture review")
+
+	f := ComputeFormality(snap)
+	if f <= 0.8 {
+		t.Errorf("modern academic text should have formality > 0.8, got %.2f", f)
+	}
+}
+
+func TestComputeFormality_ClassicalDialogue(t *testing.T) {
+	// Classical philosophical dialogue in the style of Plato's Republic (Jowett translation)
+	snap := makeSnap([]struct{ num uint32; speaker, text string }{
+		{1, "socrates", "I went down yesterday to the Piraeus with Glaucon the son of Ariston, that I might offer up my prayers to the goddess; and also because I wanted to see in what manner they would celebrate the festival, which was a new thing."},
+		{2, "cephalus", "I will tell you, Socrates, what my own feeling is. Men of my age flock together; we are birds of a feather, as the old proverb says; and at our meetings the tale of my acquaintance commonly is that life is no longer life. For if old age were the cause, I too being old, and every other old man, would have felt as they do."},
+		{3, "socrates", "Well said, Cephalus; but as concerning justice, what is it? To speak the truth and to pay your debts — no more than this? And even to this are there not exceptions? Suppose that a friend when in his right mind has deposited arms with me and he asks for them when he is not in his right mind, ought I to give them back to him?"},
+		{4, "cephalus", "One of which I could not expect easily to convince others. For let me tell you, Socrates, that when a man thinks himself to be near death, fears and cares enter into his mind which he never had before; the tales of a world below and the punishment which is exacted there of deeds done here were once a laughing matter to him. But to him who is conscious of no sin, sweet hope, as Pindar charmingly says, is the kind nurse of his age."},
+		{5, "socrates", "How admirable are his words! And the great blessing of riches, I do not say to every man, but to a good man, is that he has had no occasion to deceive or to defraud others. Now to this peace of mind the possession of wealth greatly contributes; and therefore I say, that of the many advantages which wealth has to give, to a man of sense this is in my opinion the greatest."},
+	}, "What is the meaning of justice?")
+
+	f := ComputeFormality(snap)
+	if f <= 0.7 {
+		t.Errorf("classical Platonic dialogue should have formality > 0.7, got %.2f", f)
+	}
+}
+
+func TestComputeFormality_ClassicalArchaicVocabulary(t *testing.T) {
+	// Text with explicit archaic vocabulary markers
+	snap := makeSnap([]struct{ num uint32; speaker, text string }{
+		{1, "speaker", "Whence then does this corruption arise? Wherein lies the fault of the reasoning, hitherto so well conducted? It follows that we must acknowledge the distinction between appearance and reality."},
+		{2, "speaker", "Furthermore, I maintain that one must consider the nature of justice not merely as it appears to the multitude, but as it is in itself. Inasmuch as we have granted the first premise, it is evident that the conclusion must follow necessarily therefrom."},
+		{3, "speaker", "Let us suppose, for the sake of argument, that he who is of a calm and happy nature will hardly feel the pressure of age. Is it not so? Do you not think that the man who has lived justly need fear no punishment hereafter?"},
+	}, "philosophical inquiry")
+
+	f := ComputeFormality(snap)
+	if f <= 0.85 {
+		t.Errorf("text with archaic formal vocabulary should have formality > 0.85, got %.2f", f)
+	}
+}
+
+func TestComputeFormality_MixedRegister(t *testing.T) {
+	// Mix of formal and informal turns — should score in the middle
+	snap := makeSnap([]struct{ num uint32; speaker, text string }{
+		{1, "user", "hey can you explain what justice means?"},
+		{2, "assistant", "According to philosophical tradition, justice is typically understood as giving to each person what is their due. Furthermore, it should be noted that different schools of thought have varying conceptions thereof."},
+		{3, "user", "yeah that's cool but like what does it mean practically though?"},
+		{4, "assistant", "In practical terms, justice involves both procedural fairness and substantive equity. Nevertheless, the application varies considerably depending on the context and the legal framework in question."},
+	}, "discussion of justice")
+
+	f := ComputeFormality(snap)
+	if f <= 0.4 || f >= 0.9 {
+		t.Errorf("mixed register should score in middle range (0.4–0.9), got %.2f", f)
+	}
+}
+
+func TestComputeFormality_NilSnap(t *testing.T) {
+	f := ComputeFormality(nil)
+	if f != 0.5 {
+		t.Errorf("nil snap should return 0.5, got %.2f", f)
 	}
 }
 

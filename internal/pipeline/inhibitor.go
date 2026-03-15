@@ -268,6 +268,11 @@ func makeDecision(fid string, action cerebrov1.InhibitionAction, reason string,
 
 // ComputeFormality estimates conversational formality from 0.0 (very informal)
 // to 1.0 (very formal). Mechanical heuristic — no LLM.
+//
+// The scorer handles three register types:
+//   - Modern casual: contractions, internet slang, exclamations → low score
+//   - Modern formal/academic: technical hedges, institutional phrasing → high score
+//   - Classical/literary: archaic vocabulary, complex syntax, no contractions → high score
 func ComputeFormality(snap *reasoningv1.ConversationSnapshot) float64 {
 	if snap == nil {
 		return 0.5
@@ -278,8 +283,15 @@ func ComputeFormality(snap *reasoningv1.ConversationSnapshot) float64 {
 	for _, turn := range snap.GetTurns() {
 		text := textutil.NormalizeQuotes(strings.ToLower(turn.GetRawText()))
 
-		// Formal markers
+		// Modern formal markers
 		for _, marker := range formalMarkers {
+			if strings.Contains(text, marker) {
+				formalCount++
+			}
+		}
+
+		// Classical / archaic formal markers
+		for _, marker := range classicalFormalMarkers {
 			if strings.Contains(text, marker) {
 				formalCount++
 			}
@@ -294,8 +306,12 @@ func ComputeFormality(snap *reasoningv1.ConversationSnapshot) float64 {
 
 		// Structural signals
 		words := strings.Fields(text)
+
 		if len(words) > 25 {
 			formalCount++ // Long sentences suggest formality
+		}
+		if len(words) > 50 {
+			formalCount++ // Very long sentences strongly suggest formality
 		}
 		if len(words) < 8 && len(words) > 0 {
 			informalCount++ // Very short turns suggest informality
@@ -313,6 +329,19 @@ func ComputeFormality(snap *reasoningv1.ConversationSnapshot) float64 {
 		if strings.Count(text, "!") > 0 {
 			informalCount++
 		}
+
+		// Semicolons signal complex, multi-clause sentences (formal / literary register)
+		if strings.Count(text, ";") >= 2 {
+			formalCount++
+		}
+
+		// Rhetorical question patterns (classical argumentative style)
+		for _, pat := range rhetoricalPatterns {
+			if strings.Contains(text, pat) {
+				formalCount++
+				break
+			}
+		}
 	}
 
 	total := formalCount + informalCount
@@ -328,6 +357,31 @@ var formalMarkers = []string{
 	"based on the analysis", "the data suggests", "it should be noted",
 	"with respect to", "in accordance with", "pursuant to",
 	"the specification", "the requirement", "as per",
+	"moreover", "nevertheless", "notwithstanding", "nonetheless",
+	"it follows that", "one must", "let us consider", "as i have said",
+	"it is evident", "we must acknowledge", "i maintain",
+	"in conclusion", "in summary", "to summarise", "to summarize",
+}
+
+// classicalFormalMarkers covers archaic and literary vocabulary that signals
+// formal classical register. These appear in texts such as Plato (Jowett),
+// Aristotle, King James Bible, and 18th–19th century philosophical prose.
+var classicalFormalMarkers = []string{
+	"whence", "hitherto", "wherefore", "thereof", "wherein",
+	"hereby", "heretofore", "forthwith", "inasmuch", "therein",
+	"therefrom", "thereupon", "hereafter", "hereunto", "heretofore",
+	"perchance", "mayhaps", "methinks", "forsooth", "verily",
+	"pray tell", "pray ", "nay ", " nay,",
+	"thou ", "thee ", "thy ", "thine ", "dost ", "hath ", "wilt ",
+	"for it is", "for he who", "for she who", "for they who",
+	"is it not", "do you not", "have you not", "are you not",
+	"ought to", "ought not", "would have it",
+	"in like manner", "in the same manner", "by the same token",
+	"on the contrary", "to the contrary",
+	"it must be", "it cannot be", "it would seem", "it appears that",
+	"as i have argued", "as we have seen", "as has been shown",
+	"let us suppose", "let us assume", "let us grant",
+	"one who is", "he who is", "she who is",
 }
 
 var informalMarkers = []string{
@@ -335,6 +389,14 @@ var informalMarkers = []string{
 	"lol", "haha", "btw", "imo", "imho", "tbh",
 	"yeah", "yep", "nah", "nope", "cool", "awesome",
 	"hey ", "hi ", "yo ", "sup ",
+}
+
+// rhetoricalPatterns captures argumentative question forms common in classical
+// philosophical dialogue and formal oratory.
+var rhetoricalPatterns = []string{
+	"is it not the case", "do you not think", "would you not say",
+	"can you not see", "must we not", "should we not",
+	"is it not true", "is it not so", "is this not",
 }
 
 var contractions = []string{
