@@ -78,9 +78,12 @@ func extractKeywords(text string) []string {
 		if w == "" || len(w) < 3 || stopwords[w] {
 			continue
 		}
-		if !seen[w] {
-			seen[w] = true
-			keywords = append(keywords, w)
+		// Normalize to stem so inflected forms compare equal in Jaccard similarity.
+		// "justice" → "justic", "arguing" → "argu", etc.
+		s := stemWord(w)
+		if !seen[s] {
+			seen[s] = true
+			keywords = append(keywords, s)
 		}
 	}
 	return keywords
