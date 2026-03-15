@@ -171,6 +171,7 @@ const (
 	FindingType_STATUS_QUO_BIAS      FindingType = 12
 	FindingType_ORDER_BIAS           FindingType = 13
 	FindingType_CONCEPTUAL_ANCHORING FindingType = 14
+	FindingType_INHERITED_POSITION   FindingType = 15
 	// Epistemic hygiene
 	FindingType_CONFIDENCE_MISCALIBRATION FindingType = 20
 	FindingType_ASSUMPTION_UNACKNOWLEDGED FindingType = 21
@@ -199,6 +200,7 @@ var (
 		12: "STATUS_QUO_BIAS",
 		13: "ORDER_BIAS",
 		14: "CONCEPTUAL_ANCHORING",
+		15: "INHERITED_POSITION",
 		20: "CONFIDENCE_MISCALIBRATION",
 		21: "ASSUMPTION_UNACKNOWLEDGED",
 		22: "EVIDENCE_QUALITY_LOW",
@@ -221,6 +223,7 @@ var (
 		"STATUS_QUO_BIAS":            12,
 		"ORDER_BIAS":                 13,
 		"CONCEPTUAL_ANCHORING":       14,
+		"INHERITED_POSITION":         15,
 		"CONFIDENCE_MISCALIBRATION":  20,
 		"ASSUMPTION_UNACKNOWLEDGED":  21,
 		"EVIDENCE_QUALITY_LOW":       22,
@@ -1013,9 +1016,11 @@ type CognitiveAssessment struct {
 	Scope *ScopeDetail `protobuf:"bytes,14,opt,name=scope,proto3" json:"scope,omitempty"`
 	// 15 reserved
 	// Conceptual anchoring-specific (populated only for CONCEPTUAL_ANCHORING findings)
-	ConceptualAnchoring *ConceptualAnchoringDetail `protobuf:"bytes,16,opt,name=conceptual_anchoring,json=conceptualAnchoring,proto3" json:"conceptual_anchoring,omitempty"` // 17-19 reserved for additional finding-specific details
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	ConceptualAnchoring *ConceptualAnchoringDetail `protobuf:"bytes,16,opt,name=conceptual_anchoring,json=conceptualAnchoring,proto3" json:"conceptual_anchoring,omitempty"`
+	// Inherited-position-specific (populated only for INHERITED_POSITION findings)
+	InheritedPosition *InheritedPositionDetail `protobuf:"bytes,17,opt,name=inherited_position,json=inheritedPosition,proto3" json:"inherited_position,omitempty"` // 18-19 reserved for additional finding-specific details
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *CognitiveAssessment) Reset() {
@@ -1135,6 +1140,13 @@ func (x *CognitiveAssessment) GetScope() *ScopeDetail {
 func (x *CognitiveAssessment) GetConceptualAnchoring() *ConceptualAnchoringDetail {
 	if x != nil {
 		return x.ConceptualAnchoring
+	}
+	return nil
+}
+
+func (x *CognitiveAssessment) GetInheritedPosition() *InheritedPositionDetail {
+	if x != nil {
+		return x.InheritedPosition
 	}
 	return nil
 }
@@ -1557,6 +1569,84 @@ func (x *ConceptualAnchoringDetail) GetCounterClaimsAcknowledged() bool {
 	return false
 }
 
+// Detail sub-message for INHERITED_POSITION findings.
+// Populated in CognitiveAssessment.inherited_position (field 17).
+type InheritedPositionDetail struct {
+	state                           protoimpl.MessageState `protogen:"open.v1"`
+	AuthorityFigures                []string               `protobuf:"bytes,1,rep,name=authority_figures,json=authorityFigures,proto3" json:"authority_figures,omitempty"`                                                 // names/entities cited as authorities
+	AuthorityCitationCount          uint32                 `protobuf:"varint,2,opt,name=authority_citation_count,json=authorityCitationCount,proto3" json:"authority_citation_count,omitempty"`                            // total authority citations detected
+	IndependentJustificationPresent bool                   `protobuf:"varint,3,opt,name=independent_justification_present,json=independentJustificationPresent,proto3" json:"independent_justification_present,omitempty"` // true if any citation is independently justified
+	CitationTurns                   []uint32               `protobuf:"varint,4,rep,packed,name=citation_turns,json=citationTurns,proto3" json:"citation_turns,omitempty"`                                                  // turns where authority was cited
+	DefendedClaim                   string                 `protobuf:"bytes,5,opt,name=defended_claim,json=defendedClaim,proto3" json:"defended_claim,omitempty"`                                                          // the position being defended by authority
+	unknownFields                   protoimpl.UnknownFields
+	sizeCache                       protoimpl.SizeCache
+}
+
+func (x *InheritedPositionDetail) Reset() {
+	*x = InheritedPositionDetail{}
+	mi := &file_cog_reasoning_v1_reasoning_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InheritedPositionDetail) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InheritedPositionDetail) ProtoMessage() {}
+
+func (x *InheritedPositionDetail) ProtoReflect() protoreflect.Message {
+	mi := &file_cog_reasoning_v1_reasoning_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InheritedPositionDetail.ProtoReflect.Descriptor instead.
+func (*InheritedPositionDetail) Descriptor() ([]byte, []int) {
+	return file_cog_reasoning_v1_reasoning_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *InheritedPositionDetail) GetAuthorityFigures() []string {
+	if x != nil {
+		return x.AuthorityFigures
+	}
+	return nil
+}
+
+func (x *InheritedPositionDetail) GetAuthorityCitationCount() uint32 {
+	if x != nil {
+		return x.AuthorityCitationCount
+	}
+	return 0
+}
+
+func (x *InheritedPositionDetail) GetIndependentJustificationPresent() bool {
+	if x != nil {
+		return x.IndependentJustificationPresent
+	}
+	return false
+}
+
+func (x *InheritedPositionDetail) GetCitationTurns() []uint32 {
+	if x != nil {
+		return x.CitationTurns
+	}
+	return nil
+}
+
+func (x *InheritedPositionDetail) GetDefendedClaim() string {
+	if x != nil {
+		return x.DefendedClaim
+	}
+	return ""
+}
+
 // The synthesized output of the full cognitive pipeline.
 type ReasoningReport struct {
 	state                 protoimpl.MessageState `protogen:"open.v1"`
@@ -1577,7 +1667,7 @@ type ReasoningReport struct {
 
 func (x *ReasoningReport) Reset() {
 	*x = ReasoningReport{}
-	mi := &file_cog_reasoning_v1_reasoning_proto_msgTypes[15]
+	mi := &file_cog_reasoning_v1_reasoning_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1589,7 +1679,7 @@ func (x *ReasoningReport) String() string {
 func (*ReasoningReport) ProtoMessage() {}
 
 func (x *ReasoningReport) ProtoReflect() protoreflect.Message {
-	mi := &file_cog_reasoning_v1_reasoning_proto_msgTypes[15]
+	mi := &file_cog_reasoning_v1_reasoning_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1602,7 +1692,7 @@ func (x *ReasoningReport) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReasoningReport.ProtoReflect.Descriptor instead.
 func (*ReasoningReport) Descriptor() ([]byte, []int) {
-	return file_cog_reasoning_v1_reasoning_proto_rawDescGZIP(), []int{15}
+	return file_cog_reasoning_v1_reasoning_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ReasoningReport) GetFindings() []*CognitiveAssessment {
@@ -1736,7 +1826,7 @@ const file_cog_reasoning_v1_reasoning_proto_rawDesc = "" +
 	"\rchosen_option\x18\x04 \x01(\tR\fchosenOption\x127\n" +
 	"\x17considered_alternatives\x18\x05 \x03(\tR\x16consideredAlternatives\x12)\n" +
 	"\x10stated_rationale\x18\x06 \x01(\tR\x0fstatedRationale\x12#\n" +
-	"\revidence_refs\x18\a \x03(\tR\fevidenceRefs\"\xf6\x05\n" +
+	"\revidence_refs\x18\a \x03(\tR\fevidenceRefs\"\xd0\x06\n" +
 	"\x13CognitiveAssessment\x12@\n" +
 	"\ffinding_type\x18\x01 \x01(\x0e2\x1d.cog.reasoning.v1.FindingTypeR\vfindingType\x12=\n" +
 	"\bseverity\x18\x02 \x01(\x0e2!.cog.reasoning.v1.FindingSeverityR\bseverity\x12 \n" +
@@ -1753,7 +1843,8 @@ const file_cog_reasoning_v1_reasoning_proto_rawDesc = "" +
 	"\rcontradiction\x18\f \x01(\v2%.cog.reasoning.v1.ContradictionDetailR\rcontradiction\x12E\n" +
 	"\vcalibration\x18\r \x01(\v2#.cog.reasoning.v1.CalibrationDetailR\vcalibration\x123\n" +
 	"\x05scope\x18\x0e \x01(\v2\x1d.cog.reasoning.v1.ScopeDetailR\x05scope\x12^\n" +
-	"\x14conceptual_anchoring\x18\x10 \x01(\v2+.cog.reasoning.v1.ConceptualAnchoringDetailR\x13conceptualAnchoring\"\xc8\x01\n" +
+	"\x14conceptual_anchoring\x18\x10 \x01(\v2+.cog.reasoning.v1.ConceptualAnchoringDetailR\x13conceptualAnchoring\x12X\n" +
+	"\x12inherited_position\x18\x11 \x01(\v2).cog.reasoning.v1.InheritedPositionDetailR\x11inheritedPosition\"\xc8\x01\n" +
 	"\x0fAnchoringDetail\x12!\n" +
 	"\fanchor_value\x18\x01 \x01(\x01R\vanchorValue\x12%\n" +
 	"\x0eestimate_value\x18\x02 \x01(\x01R\restimateValue\x12%\n" +
@@ -1790,7 +1881,13 @@ const file_cog_reasoning_v1_reasoning_proto_rawDesc = "" +
 	"\x14semantic_orbit_ratio\x18\x03 \x01(\x01R\x12semanticOrbitRatio\x120\n" +
 	"\x14avg_semantic_overlap\x18\x04 \x01(\x01R\x12avgSemanticOverlap\x12%\n" +
 	"\x0eturns_analyzed\x18\x05 \x01(\rR\rturnsAnalyzed\x12>\n" +
-	"\x1bcounter_claims_acknowledged\x18\x06 \x01(\bR\x19counterClaimsAcknowledged\"\xf5\x03\n" +
+	"\x1bcounter_claims_acknowledged\x18\x06 \x01(\bR\x19counterClaimsAcknowledged\"\x9a\x02\n" +
+	"\x17InheritedPositionDetail\x12+\n" +
+	"\x11authority_figures\x18\x01 \x03(\tR\x10authorityFigures\x128\n" +
+	"\x18authority_citation_count\x18\x02 \x01(\rR\x16authorityCitationCount\x12J\n" +
+	"!independent_justification_present\x18\x03 \x01(\bR\x1findependentJustificationPresent\x12%\n" +
+	"\x0ecitation_turns\x18\x04 \x03(\rR\rcitationTurns\x12%\n" +
+	"\x0edefended_claim\x18\x05 \x01(\tR\rdefendedClaim\"\xf5\x03\n" +
 	"\x0fReasoningReport\x12A\n" +
 	"\bfindings\x18\x01 \x03(\v2%.cog.reasoning.v1.CognitiveAssessmentR\bfindings\x126\n" +
 	"\x17overall_integrity_score\x18\x02 \x01(\x01R\x15overallIntegrityScore\x12%\n" +
@@ -1817,7 +1914,7 @@ const file_cog_reasoning_v1_reasoning_proto_rawDesc = "" +
 	"\x04INFO\x10\x01\x12\v\n" +
 	"\aCAUTION\x10\x02\x12\v\n" +
 	"\aWARNING\x10\x03\x12\f\n" +
-	"\bCRITICAL\x10\x04*\xea\x03\n" +
+	"\bCRITICAL\x10\x04*\x82\x04\n" +
 	"\vFindingType\x12\x1c\n" +
 	"\x18FINDING_TYPE_UNSPECIFIED\x10\x00\x12\x11\n" +
 	"\rCONTRADICTION\x10\x01\x12\x16\n" +
@@ -1830,7 +1927,8 @@ const file_cog_reasoning_v1_reasoning_proto_rawDesc = "" +
 	"\x0fSTATUS_QUO_BIAS\x10\f\x12\x0e\n" +
 	"\n" +
 	"ORDER_BIAS\x10\r\x12\x18\n" +
-	"\x14CONCEPTUAL_ANCHORING\x10\x0e\x12\x1d\n" +
+	"\x14CONCEPTUAL_ANCHORING\x10\x0e\x12\x16\n" +
+	"\x12INHERITED_POSITION\x10\x0f\x12\x1d\n" +
 	"\x19CONFIDENCE_MISCALIBRATION\x10\x14\x12\x1d\n" +
 	"\x19ASSUMPTION_UNACKNOWLEDGED\x10\x15\x12\x18\n" +
 	"\x14EVIDENCE_QUALITY_LOW\x10\x16\x12\x16\n" +
@@ -1871,7 +1969,7 @@ func file_cog_reasoning_v1_reasoning_proto_rawDescGZIP() []byte {
 }
 
 var file_cog_reasoning_v1_reasoning_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_cog_reasoning_v1_reasoning_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_cog_reasoning_v1_reasoning_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_cog_reasoning_v1_reasoning_proto_goTypes = []any{
 	(EpistemicStatus)(0),              // 0: cog.reasoning.v1.EpistemicStatus
 	(FindingSeverity)(0),              // 1: cog.reasoning.v1.FindingSeverity
@@ -1893,11 +1991,12 @@ var file_cog_reasoning_v1_reasoning_proto_goTypes = []any{
 	(*CalibrationDetail)(nil),         // 17: cog.reasoning.v1.CalibrationDetail
 	(*ScopeDetail)(nil),               // 18: cog.reasoning.v1.ScopeDetail
 	(*ConceptualAnchoringDetail)(nil), // 19: cog.reasoning.v1.ConceptualAnchoringDetail
-	(*ReasoningReport)(nil),           // 20: cog.reasoning.v1.ReasoningReport
-	(*timestamppb.Timestamp)(nil),     // 21: google.protobuf.Timestamp
+	(*InheritedPositionDetail)(nil),   // 20: cog.reasoning.v1.InheritedPositionDetail
+	(*ReasoningReport)(nil),           // 21: cog.reasoning.v1.ReasoningReport
+	(*timestamppb.Timestamp)(nil),     // 22: google.protobuf.Timestamp
 }
 var file_cog_reasoning_v1_reasoning_proto_depIdxs = []int32{
-	21, // 0: cog.reasoning.v1.Turn.timestamp:type_name -> google.protobuf.Timestamp
+	22, // 0: cog.reasoning.v1.Turn.timestamp:type_name -> google.protobuf.Timestamp
 	6,  // 1: cog.reasoning.v1.Turn.metadata:type_name -> cog.reasoning.v1.TurnMetadata
 	7,  // 2: cog.reasoning.v1.TurnMetadata.numeric_tokens:type_name -> cog.reasoning.v1.NumericToken
 	5,  // 3: cog.reasoning.v1.ConversationSnapshot.turns:type_name -> cog.reasoning.v1.Turn
@@ -1914,15 +2013,16 @@ var file_cog_reasoning_v1_reasoning_proto_depIdxs = []int32{
 	17, // 14: cog.reasoning.v1.CognitiveAssessment.calibration:type_name -> cog.reasoning.v1.CalibrationDetail
 	18, // 15: cog.reasoning.v1.CognitiveAssessment.scope:type_name -> cog.reasoning.v1.ScopeDetail
 	19, // 16: cog.reasoning.v1.CognitiveAssessment.conceptual_anchoring:type_name -> cog.reasoning.v1.ConceptualAnchoringDetail
-	3,  // 17: cog.reasoning.v1.CalibrationDetail.expressed:type_name -> cog.reasoning.v1.ConfidenceLevel
-	0,  // 18: cog.reasoning.v1.CalibrationDetail.actual_warrant:type_name -> cog.reasoning.v1.EpistemicStatus
-	13, // 19: cog.reasoning.v1.ReasoningReport.findings:type_name -> cog.reasoning.v1.CognitiveAssessment
-	21, // 20: cog.reasoning.v1.ReasoningReport.assessed_at:type_name -> google.protobuf.Timestamp
-	21, // [21:21] is the sub-list for method output_type
-	21, // [21:21] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	20, // 17: cog.reasoning.v1.CognitiveAssessment.inherited_position:type_name -> cog.reasoning.v1.InheritedPositionDetail
+	3,  // 18: cog.reasoning.v1.CalibrationDetail.expressed:type_name -> cog.reasoning.v1.ConfidenceLevel
+	0,  // 19: cog.reasoning.v1.CalibrationDetail.actual_warrant:type_name -> cog.reasoning.v1.EpistemicStatus
+	13, // 20: cog.reasoning.v1.ReasoningReport.findings:type_name -> cog.reasoning.v1.CognitiveAssessment
+	22, // 21: cog.reasoning.v1.ReasoningReport.assessed_at:type_name -> google.protobuf.Timestamp
+	22, // [22:22] is the sub-list for method output_type
+	22, // [22:22] is the sub-list for method input_type
+	22, // [22:22] is the sub-list for extension type_name
+	22, // [22:22] is the sub-list for extension extendee
+	0,  // [0:22] is the sub-list for field type_name
 }
 
 func init() { file_cog_reasoning_v1_reasoning_proto_init() }
@@ -1936,7 +2036,7 @@ func file_cog_reasoning_v1_reasoning_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_cog_reasoning_v1_reasoning_proto_rawDesc), len(file_cog_reasoning_v1_reasoning_proto_rawDesc)),
 			NumEnums:      5,
-			NumMessages:   16,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

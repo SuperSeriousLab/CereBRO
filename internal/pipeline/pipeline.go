@@ -41,6 +41,7 @@ type PipelineConfig struct {
 	DomainContext       *DomainContext           // optional domain hint from upstream (e.g. Sophrim); nil = defaults
 	SophrimEndpoint     string                   // if non-empty, fetch DomainContext before pipeline run (advisory, 200ms timeout)
 	ConceptualAnchoring ConceptualAnchoringConfig // Tier 2: conceptual anchoring detector
+	InheritedPosition   InheritedPositionConfig   // Tier 2: inherited-position detector
 
 	// Sophrim feedback (Connection A of the Lamarckian Loop).
 	// Set by the caller with metadata from SLR / Sophrim grounding.
@@ -65,6 +66,7 @@ func DefaultPipelineConfig() PipelineConfig {
 		SelfConfidence:      DefaultSelfConfidenceConfig(),
 		Feedback:            DefaultFeedbackConfig(),
 		ConceptualAnchoring: DefaultConceptualAnchoringConfig(),
+		InheritedPosition:   DefaultInheritedPositionConfig(),
 	}
 }
 
@@ -386,6 +388,12 @@ func buildDetectorMap(cfg PipelineConfig) map[Detector]DetectorFunc {
 	// anchoring is absent. cfg.SkipAnchoring only suppresses the numeric detector.
 	m[DetectorConceptualAnchoring] = func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
 		return DetectConceptualAnchoring(snap, cfg.ConceptualAnchoring)
+	}
+
+	// Inherited Position: ALWAYS registered — fires on authority-citation patterns
+	// without independent justification. Distinct from sunk-cost and conceptual anchoring.
+	m[DetectorInheritedPosition] = func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
+		return DetectInheritedPosition(snap, cfg.InheritedPosition)
 	}
 
 	return m

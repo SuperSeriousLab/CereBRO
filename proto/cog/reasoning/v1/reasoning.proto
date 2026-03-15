@@ -62,6 +62,7 @@ enum FindingType {
   STATUS_QUO_BIAS = 12;
   ORDER_BIAS = 13;
   CONCEPTUAL_ANCHORING = 14;
+  INHERITED_POSITION   = 15;
 
   // Epistemic hygiene
   CONFIDENCE_MISCALIBRATION = 20;
@@ -226,7 +227,9 @@ message CognitiveAssessment {
   // 15 reserved
   // Conceptual anchoring-specific (populated only for CONCEPTUAL_ANCHORING findings)
   ConceptualAnchoringDetail conceptual_anchoring = 16;
-  // 17-19 reserved for additional finding-specific details
+  // Inherited-position-specific (populated only for INHERITED_POSITION findings)
+  InheritedPositionDetail inherited_position = 17;
+  // 18-19 reserved for additional finding-specific details
 }
 
 // Detail sub-messages for specific finding types.
@@ -277,6 +280,16 @@ message ConceptualAnchoringDetail {
   bool   counter_claims_acknowledged = 6; // true if any counter-claim was accepted/refined
 }
 
+
+// Detail sub-message for INHERITED_POSITION findings.
+// Populated in CognitiveAssessment.inherited_position (field 17).
+message InheritedPositionDetail {
+  repeated string authority_figures            = 1;  // names/entities cited as authorities
+  uint32          authority_citation_count     = 2;  // total authority citations detected
+  bool            independent_justification_present = 3; // true if any citation is independently justified
+  repeated uint32 citation_turns              = 4;  // turns where authority was cited
+  string          defended_claim              = 5;  // the position being defended by authority
+}
 
 // =============================================================================
 // Reasoning report (output of Synthesis Aggregator)

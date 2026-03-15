@@ -17,6 +17,7 @@ const (
 	DetectorCalibrator            Detector = "confidence-calibrator"
 	DetectorLedger                Detector = "decision-ledger"
 	DetectorConceptualAnchoring   Detector = "conceptual-anchoring-detector"
+	DetectorInheritedPosition     Detector = "inherited-position-detector"
 )
 
 // RouterConfig holds activation thresholds.
@@ -54,6 +55,21 @@ var costPhrasePatterns = []string{
 	"we have already agreed", "our earlier argument", "having committed ourselves",
 	"the position we have defended", "it were unjust to abandon",
 	"that is implied in the argument", "as we were just now saying",
+}
+
+// inheritedPositionActivationPhrases are a subset of authorityPhrases used for
+// fast routing activation. A match triggers the inherited-position-detector.
+// Must not overlap heavily with costPhrasePatterns (sunk-cost detector routing).
+var inheritedPositionActivationPhrases = []string{
+	"as simonides", "simonides said", "simonides taught",
+	"according to", "as homer", "homer said",
+	"as aristotle", "as plato", "as socrates said",
+	"as was said", "as the saying", "as the poet",
+	"tradition holds", "we have always", "it has always been",
+	"following the tradition", "the tradition of",
+	// Generic "as X said/taught/argued" — router uses simple keyword presence
+	" said that", " taught that", " argued that", " maintained that",
+	" believed that", " held that",
 }
 
 // decisionPhrasePatterns for decision-ledger activation check.
@@ -164,6 +180,29 @@ func Route(snap *reasoningv1.ConversationSnapshot, cfg RouterConfig) RoutingDeci
 		if hasDeclarative {
 			activated = append(activated, DetectorConceptualAnchoring)
 			reasons = append(reasons, "declarative assertion in early turns — conceptual anchor candidate")
+		}
+	}
+
+	// Inherited Position: activate when conversation has >= 4 turns and any
+	// authority citation patterns are present. These patterns signal "X said/taught/..."
+	// structures that the inherited-position-detector scrutinises for missing merit defense.
+	if nTurns >= 4 {
+		hasAuthorityCitation := false
+		for _, t := range turns {
+			lower := strings.ToLower(t.GetRawText())
+			for _, p := range inheritedPositionActivationPhrases {
+				if strings.Contains(lower, p) {
+					hasAuthorityCitation = true
+					break
+				}
+			}
+			if hasAuthorityCitation {
+				break
+			}
+		}
+		if hasAuthorityCitation {
+			activated = append(activated, DetectorInheritedPosition)
+			reasons = append(reasons, "authority citation patterns detected — checking for inherited-position reasoning")
 		}
 	}
 

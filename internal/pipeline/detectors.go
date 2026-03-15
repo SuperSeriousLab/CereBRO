@@ -1627,6 +1627,358 @@ func DetectConceptualAnchoring(snap *reasoningv1.ConversationSnapshot, cfg Conce
 	}
 }
 
+// ============================================================
+// Inherited-Position Detector
+// ============================================================
+
+// InheritedPositionConfig holds thresholds for the inherited-position detector.
+type InheritedPositionConfig struct {
+	MinCitations        uint32  // min authority citations to trigger (default 3)
+	MeritRatio          float64 // max fraction of citations WITHOUT merit to fire (default 0.3 → unjustified_ratio must be > 0.7... wait, spec says merit_ratio is the MERIT threshold)
+	CitationWindowTurns uint32  // unused in current algorithm — reserved for future windowed variant (default 5)
+}
+
+// DefaultInheritedPositionConfig returns sensible defaults.
+// MeritRatio is the maximum fraction of citation turns that have merit-based defense
+// for the finding to fire — i.e., if more than MeritRatio of citations include
+// independent justification, the position is legitimately defended and no finding fires.
+// Default 0.3 matches the spec: merit_defenses < 0.3 * authority_citations fires.
+func DefaultInheritedPositionConfig() InheritedPositionConfig {
+	return InheritedPositionConfig{
+		MinCitations:        3,
+		MeritRatio:          0.3,
+		CitationWindowTurns: 5,
+	}
+}
+
+// authorityPatterns are regex-like patterns for authority citation detection.
+// We use strings.Contains and strings-based matching since the go pipeline is
+// PURE deterministic and avoids the regexp package import overhead.
+// Patterns are ordered from most specific to least specific.
+var authorityPhrases = []string{
+	"as simonides said",
+	"as simonides",
+	"simonides said",
+	"simonides taught",
+	"simonides argued",
+	"simonides held",
+	"simonides maintained",
+	"simonides believed",
+	"simonides tells us",
+	"simonides would say",
+	// Generic "as X said/taught/argued/held/maintained" patterns — matched by checking
+	// prefix "as " + capitalized word cluster + " said/taught/..." in scanCitationVerb
+	// Generic "according to X" patterns
+	"according to",
+	// Generic "X believed/held that" — matched by suffix patterns in scanBelievedHeld
+	// Generic "following X's teaching/argument/position"
+	"following the tradition",
+	"following the teaching",
+	"the tradition of",
+	"tradition holds",
+	"we have always",
+	"it has always been",
+	"we always have",
+	"they have always",
+	// Classical markers used specifically in Platonic dialogues
+	"as was said",
+	"as has been said",
+	"as we said",
+	"as was agreed",
+	"as the saying goes",
+	"as the poet says",
+	"as the poet said",
+	"as homer said",
+	"as homer says",
+	"homer says",
+	"homer said",
+}
+
+// citationVerbSuffixes are the verb suffixes that follow a name in "as X <verb>" patterns.
+var citationVerbSuffixes = []string{
+	" said", " says", " taught", " teaches", " argued", " argues",
+	" held", " holds", " maintained", " maintains", " believed", " believes",
+	" tells us", " would say", " has said", " once said", " declared",
+}
+
+// meritMarkers indicate independent justification when found near a citation.
+var meritMarkers = []string{
+	"because ", "since ", "the reason is", "evidence shows", "we can see that",
+	"it follows from", ", for ", "for the reason", "as is evident",
+	"the proof is", "it follows that", "as has been shown", "as we have shown",
+	"therefore", "thus we", "this means", "implies that", "which shows",
+	"data shows", "studies show", "we can observe", "consider that",
+}
+
+// noMeritIndicators are phrases that signal bare assertion — NOT independent justification.
+var noMeritIndicators = []string{
+	"obviously", "clearly", "it is well known", "everyone knows",
+	"as everyone can see", "it goes without saying", "needless to say",
+	"of course", "it is obvious",
+}
+
+// findAuthorityCitation checks whether a turn's text contains an authority citation.
+// Returns the authority name (or phrase) if found, empty string otherwise.
+func findAuthorityCitation(text string) string {
+	lower := strings.ToLower(textutil.NormalizeQuotes(text))
+
+	// Check fixed authority phrases first (most reliable).
+	for _, phrase := range authorityPhrases {
+		if strings.Contains(lower, phrase) {
+			return phrase
+		}
+	}
+
+	// Check "as <Word(s)> said/taught/argued/..." patterns.
+	// Look for "as " followed eventually by a citation verb suffix.
+	asIdx := strings.Index(lower, "as ")
+	if asIdx >= 0 {
+		after := lower[asIdx+3:]
+		for _, verb := range citationVerbSuffixes {
+			if idx := strings.Index(after, verb); idx > 0 && idx <= 40 {
+				// Extract the candidate name region (up to the verb)
+				candidate := strings.TrimSpace(after[:idx])
+				// A proper name will have at least one non-trivial word
+				if len(candidate) >= 3 && !strings.Contains(candidate, "?") {
+					return "as " + candidate + verb
+				}
+			}
+		}
+	}
+
+	// Check "X believed/held that" — looking for <Word> believed/held patterns.
+	for _, verb := range []string{" believed that", " held that", " argued that", " maintained that", " taught that"} {
+		if idx := strings.Index(lower, verb); idx > 0 {
+			// Work backwards to find the subject word
+			before := lower[:idx]
+			words := strings.Fields(before)
+			if len(words) > 0 {
+				lastWord := words[len(words)-1]
+				if len(lastWord) >= 3 {
+					return lastWord + verb
+				}
+			}
+		}
+	}
+
+	return ""
+}
+
+// hasIndependentJustification returns true if the text contains a merit marker
+// followed by substantive content (at least minWords words after the marker),
+// and no no-merit indicator is present.
+func hasIndependentJustification(text string, minWords int) bool {
+	lower := strings.ToLower(textutil.NormalizeQuotes(text))
+
+	// Reject if a no-merit indicator is present (bare assertion signals).
+	for _, noMerit := range noMeritIndicators {
+		if strings.Contains(lower, noMerit) {
+			return false
+		}
+	}
+
+	for _, marker := range meritMarkers {
+		idx := strings.Index(lower, marker)
+		if idx < 0 {
+			continue
+		}
+		// Count words in the clause after the marker.
+		after := strings.TrimSpace(lower[idx+len(marker):])
+		words := strings.Fields(after)
+		if len(words) >= minWords {
+			return true
+		}
+	}
+	return false
+}
+
+// extractDefendedClaim returns the sentence in turn text that contains the
+// authority citation, truncated to 120 characters.
+func extractDefendedClaim(text string) string {
+	// Split on sentence terminators and return the sentence with the citation.
+	sentences := strings.FieldsFunc(text, func(r rune) bool {
+		return r == '.' || r == '!' || r == '?' || r == ';'
+	})
+
+	lower := strings.ToLower(textutil.NormalizeQuotes(text))
+	lowerSentences := strings.FieldsFunc(lower, func(r rune) bool {
+		return r == '.' || r == '!' || r == '?' || r == ';'
+	})
+
+	// Find the sentence that contains a citation phrase.
+	for i, s := range lowerSentences {
+		hasCitation := false
+		for _, phrase := range authorityPhrases {
+			if strings.Contains(s, phrase) {
+				hasCitation = true
+				break
+			}
+		}
+		if !hasCitation {
+			for _, verb := range citationVerbSuffixes {
+				if strings.Contains(s, verb) {
+					hasCitation = true
+					break
+				}
+			}
+		}
+		if hasCitation && i < len(sentences) {
+			claim := strings.TrimSpace(sentences[i])
+			if len(claim) > 120 {
+				return claim[:120] + "..."
+			}
+			return claim
+		}
+	}
+
+	// Fallback: return start of text.
+	if len(text) > 120 {
+		return text[:120] + "..."
+	}
+	return text
+}
+
+// inheritedPositionConfidence computes confidence from citation count and unjustified ratio.
+// citation_count weight 0.4 (capped at count/10), unjustified_ratio weight 0.6.
+func inheritedPositionConfidence(citationCount uint32, unjustifiedRatio float64) float64 {
+	countNorm := math.Min(float64(citationCount)/10.0, 1.0)
+	return clamp(0.4*countNorm+0.6*unjustifiedRatio, 0.0, 1.0)
+}
+
+func inheritedPositionSeverity(confidence float64) reasoningv1.FindingSeverity {
+	if confidence >= 0.75 {
+		return reasoningv1.FindingSeverity_WARNING
+	}
+	if confidence >= 0.55 {
+		return reasoningv1.FindingSeverity_CAUTION
+	}
+	return reasoningv1.FindingSeverity_INFO
+}
+
+// joinUint32s converts a slice of uint32 to a comma-separated string.
+func joinUint32s(ns []uint32) string {
+	if len(ns) == 0 {
+		return ""
+	}
+	s := uintToString(ns[0])
+	for _, n := range ns[1:] {
+		s += ", " + uintToString(n)
+	}
+	return s
+}
+
+// joinStrings joins a slice of strings with ", ".
+func joinStrings(ss []string) string {
+	if len(ss) == 0 {
+		return ""
+	}
+	s := ss[0]
+	for _, t := range ss[1:] {
+		s += ", " + t
+	}
+	return s
+}
+
+// deduplicateStrings returns a deduplicated slice preserving order.
+func deduplicateStrings(ss []string) []string {
+	seen := make(map[string]bool)
+	out := make([]string, 0, len(ss))
+	for _, s := range ss {
+		if !seen[s] {
+			seen[s] = true
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// DetectInheritedPosition detects when a position is defended because of who holds it
+// (authority appeal) rather than its merits — the epistemic sunk-cost fallacy.
+// This is distinct from sunk-cost-detector (material investment) and from
+// conceptual-anchoring-detector (semantic orbit). The canonical test case is
+// Polemarchus defending "Simonides said X" with no independent argument.
+func DetectInheritedPosition(snap *reasoningv1.ConversationSnapshot, cfg InheritedPositionConfig) *reasoningv1.CognitiveAssessment {
+	if snap == nil {
+		return nil
+	}
+
+	turns := snap.GetTurns()
+	if len(turns) == 0 {
+		return nil
+	}
+
+	const justificationMinWords = 10 // minimum words in merit clause to count as substantive
+
+	// === Step 1: Scan for authority citations ===
+	var citationTurns []uint32
+	var justifiedTurns []uint32
+	var authoritiesCited []string
+	var defendedClaim string
+
+	for _, turn := range turns {
+		authority := findAuthorityCitation(turn.GetRawText())
+		if authority == "" {
+			continue
+		}
+
+		citationTurns = append(citationTurns, turn.GetTurnNumber())
+		authoritiesCited = append(authoritiesCited, authority)
+
+		if defendedClaim == "" {
+			defendedClaim = extractDefendedClaim(turn.GetRawText())
+		}
+
+		// Check for independent justification in the same turn.
+		if hasIndependentJustification(turn.GetRawText(), justificationMinWords) {
+			justifiedTurns = append(justifiedTurns, turn.GetTurnNumber())
+		}
+	}
+
+	// === Step 2: Apply citation count threshold ===
+	if uint32(len(citationTurns)) < cfg.MinCitations {
+		return nil // Too few citations — normal attribution
+	}
+
+	// === Step 3: Check justification coverage ===
+	unjustifiedCount := len(citationTurns) - len(justifiedTurns)
+	unjustifiedRatio := float64(unjustifiedCount) / float64(len(citationTurns))
+
+	// Spec: if merit_defenses >= merit_ratio * authority_citations, do not fire.
+	// Equivalently: fire only when unjustified_ratio > (1 - merit_ratio).
+	// With MeritRatio=0.3: fire when fewer than 30% of citations have merit defense.
+	meritThreshold := 1.0 - cfg.MeritRatio // 0.7 by default
+	if unjustifiedRatio < meritThreshold {
+		return nil // Enough citations have independent justification — legitimate citation practice
+	}
+
+	// === Step 4: Build finding ===
+	deduped := deduplicateStrings(authoritiesCited)
+	confidence := inheritedPositionConfidence(uint32(len(citationTurns)), unjustifiedRatio)
+
+	explanation := uintToString(uint32(len(citationTurns))) +
+		" authority citations to [" + joinStrings(deduped) +
+		"] found across turns " + joinUint32s(citationTurns) +
+		". " + formatFloat(unjustifiedRatio*100) +
+		"% cite authority without independent justification. " +
+		"Position defended by appeal to authority rather than merit."
+
+	return &reasoningv1.CognitiveAssessment{
+		FindingType:   reasoningv1.FindingType_INHERITED_POSITION,
+		Severity:      inheritedPositionSeverity(confidence),
+		Explanation:   explanation,
+		RelevantTurns: citationTurns,
+		Confidence:    confidence,
+		DetectorName:  "inherited-position-detector",
+		InheritedPosition: &reasoningv1.InheritedPositionDetail{
+			AuthorityFigures:               deduped,
+			AuthorityCitationCount:         uint32(len(citationTurns)),
+			IndependentJustificationPresent: len(justifiedTurns) > 0,
+			CitationTurns:                  citationTurns,
+			DefendedClaim:                  defendedClaim,
+		},
+	}
+}
+
 // uintToString converts a uint32 to its decimal string representation
 // without importing fmt (keeps the function dependency-free).
 func uintToString(n uint32) string {
