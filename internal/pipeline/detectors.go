@@ -122,6 +122,21 @@ var sunkCostPhrases = []string{
 	"already spent", "already invested", "invested so much", "come this far",
 	"put so much into", "too much time", "too much money", "too much effort",
 	"can't waste", "don't want to waste", "sunk cost", "we've already", "i've already",
+	// Classical commitment-defense markers: defending a position because of prior
+	// commitment to it or to the authority who stated it, not because of its merit.
+	// These appear in Socratic dialogue as authority-anchored sunk cost reasoning.
+	"as simonides maintains", "as my father held", "the position we have defended",
+	"having committed ourselves", "we have already agreed", "as was said before",
+	"we have established", "our earlier argument", "as i have said",
+	"the definition we gave", "what we agreed upon", "to which i agreed",
+	"as he maintained", "as they maintained", "as is maintained",
+	"for so said", "it were unjust to abandon",
+	// Phrases that actually appear in Plato's Republic (Jowett translation):
+	"i still stand by", "stand by the latter", "heir of the argument",
+	"what did simonides say", "simonides say",
+	"as we were just now saying",
+	"attributes such a saying to simonides",
+	"that is implied in the argument",
 }
 
 var continuationPhrases = []string{
@@ -129,6 +144,21 @@ var continuationPhrases = []string{
 	"let's keep", "let's continue", "we must continue", "have to finish",
 	"need to finish", "too late to change", "too late to stop",
 	"might as well", "no point stopping", "stick with",
+	// Classical continuation markers: defending the original framing, refusing to
+	// abandon a position inherited from authority or prior agreement.
+	"we must hold to", "shall we then abandon", "will you retract",
+	"do you mean to say that", "the argument stands", "must we not hold",
+	"are we to say", "must we abandon", "we cannot abandon",
+	// Classical affirmation-as-continuation: in Socratic dialogue, Polemarchus
+	// repeatedly affirms ("quite ready", "prepared to", "i am quite ready")
+	// as a way of continuing to defend the inherited position.
+	"i am quite ready", "quite ready to", "prepared to take up arms",
+	"do battle at your side", "take up arms against",
+	"i maintain that", "i still maintain", "i still say",
+	"i still think that", "i insist that", "we must not give up",
+	// Classical affirmative discourse markers: short affirmations that signal
+	// continued commitment to the prior position.
+	"certainly", "to be sure", "very true", "of course",
 }
 
 type phraseMatch struct {
@@ -808,6 +838,12 @@ var confidenceKeywords = []struct {
 var evidenceMarkers = []string{
 	"because", "since", "evidence shows", "data indicates",
 	"according to", "studies show",
+	// Classical evidence/reasoning markers. In classical English, ", for"
+	// introduces a justification clause after a comma ("X is so, for Y proves it").
+	// This comma-for pattern distinguishes the causal connective from the preposition
+	// "for" (as in "going for lunch" or "right approach for any team").
+	", for ", "as is evident", "for the reason that", "the proof is",
+	"it follows that", "as we have shown", "as has been shown",
 }
 
 // mlHedgingPhrases are common epistemic qualifiers that indicate calibrated uncertainty.
@@ -985,8 +1021,25 @@ func calibratorNormalize(s string) string {
 	return s
 }
 
+// minCertaintyTurnWords is the minimum number of words a turn must contain
+// before CERTAIN-level confidence markers are counted. Short turns like
+// "Certainly.", "True.", "Indeed.", "That is so." are discourse agreements
+// (backchannels), not overconfident claims. LIKELY/POSSIBLE/SPECULATIVE levels
+// are unaffected because hedges in short turns do reflect genuine epistemic
+// status. Threshold of 5 allows real short claims ("I'm absolutely sure of
+// this.") while blocking single-word and two/three-word discourse particles.
+const minCertaintyTurnWords = 5
+
 func detectConfidenceLevel(text string) reasoningv1.ConfidenceLevel {
 	for _, group := range confidenceKeywords {
+		// For CERTAIN-level markers, require the turn to be substantive enough
+		// to constitute an actual claim rather than a discourse particle.
+		if group.level == reasoningv1.ConfidenceLevel_CERTAIN {
+			wordCount := len(strings.Fields(text))
+			if wordCount < minCertaintyTurnWords {
+				continue
+			}
+		}
 		for _, kw := range group.keywords {
 			if strings.Contains(text, kw) {
 				return group.level

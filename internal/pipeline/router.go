@@ -41,10 +41,18 @@ type RoutingDecision struct {
 }
 
 // costPhrasePatterns for sunk-cost activation check.
+// Must stay in sync with sunkCostPhrases in detectors.go (router activates the detector;
+// detector does the detailed matching). Subset is sufficient for routing.
 var costPhrasePatterns = []string{
 	"already spent", "already invested", "invested so much", "come this far",
 	"put so much into", "too much time", "too much money", "too much effort",
 	"can't waste", "don't want to waste", "sunk cost", "we've already", "i've already",
+	// Classical commitment-defense markers (must mirror sunkCostPhrases subset):
+	"as simonides", "simonides say", "heir of the argument", "attributes such a saying",
+	"i still stand by", "stand by the latter", "as was said before",
+	"we have already agreed", "our earlier argument", "having committed ourselves",
+	"the position we have defended", "it were unjust to abandon",
+	"that is implied in the argument", "as we were just now saying",
 }
 
 // decisionPhrasePatterns for decision-ledger activation check.
