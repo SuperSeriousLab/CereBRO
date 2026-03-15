@@ -1,7 +1,10 @@
 package pipeline
 
 import (
+	"context"
+	"fmt"
 	"net/http"
+	"time"
 
 	cerebrov1 "github.com/SuperSeriousLab/CereBRO/gen/go/cerebro/v1"
 	reasoningv1 "github.com/SuperSeriousLab/CereBRO/gen/go/cog/reasoning/v1"
@@ -36,7 +39,14 @@ type PipelineConfig struct {
 	MLClient            *http.Client         // HTTP client for ML enricher (nil = use default)
 	MLEnrichment        *cerebrov1.MLEnrichment // populated at runtime by Stage 1.3 (merged view)
 	DomainContext       *DomainContext           // optional domain hint from upstream (e.g. Sophrim); nil = defaults
+	SophrimEndpoint     string                   // if non-empty, fetch DomainContext before pipeline run (advisory, 200ms timeout)
 	ConceptualAnchoring ConceptualAnchoringConfig // Tier 2: conceptual anchoring detector
+
+	// Sophrim feedback (Connection A of the Lamarckian Loop).
+	// Set by the caller with metadata from SLR / Sophrim grounding.
+	SophrimFeedbackEndpoint string  // if non-empty, send retrieval quality feedback after pipeline
+	GroundingFactIDs        []int64 // fact IDs from Sophrim grounding
+	GroundingQuery          string  // original query used for grounding
 }
 
 // DefaultPipelineConfig returns all-default detector configurations.
@@ -101,6 +111,15 @@ func Run(snap *reasoningv1.ConversationSnapshot, cfg PipelineConfig) *PipelineRe
 				Rejected: true,
 			}
 		}
+	}
+
+	// Pre-pipeline: Sophrim domain-hint fetch (advisory, 200ms budget).
+	// If SophrimEndpoint is set and DomainContext was not explicitly provided,
+	// ask Sophrim for domain hints. Failure (network, timeout, no hints) leaves
+	// DomainContext nil — the pipeline runs with defaults, no regression.
+	if cfg.SophrimEndpoint != "" && cfg.DomainContext == nil {
+		sc := NewSophrimClient(cfg.SophrimEndpoint, 200*time.Millisecond)
+		cfg.DomainContext = sc.FetchDomainContext(context.Background(), conversationSummary(snap))
 	}
 
 	// Stage 1: Intake enrichment
@@ -247,6 +266,19 @@ func Run(snap *reasoningv1.ConversationSnapshot, cfg PipelineConfig) *PipelineRe
 			result.Consolidated = true
 			result.ConsolidationTrigger = cr.Trigger
 		}
+	}
+
+	// Stage 9: Sophrim Feedback (Connection A of the Lamarckian Loop)
+	// Fire-and-forget — never blocks the pipeline response.
+	if cfg.SophrimFeedbackEndpoint != "" && len(cfg.GroundingFactIDs) > 0 {
+		sender := NewFeedbackSender(cfg.SophrimFeedbackEndpoint, 5*time.Second)
+		signal := "negative" // default: no findings = grounding wasn't helpful
+		fbContext := "no_findings"
+		if len(result.Findings) > 0 {
+			signal = "positive"
+			fbContext = fmt.Sprintf("findings=%d,types=%s", len(result.Findings), findingTypes(result))
+		}
+		go sender.SendFeedback(context.Background(), cfg.GroundingQuery, cfg.GroundingFactIDs, signal, fbContext)
 	}
 
 	return result
