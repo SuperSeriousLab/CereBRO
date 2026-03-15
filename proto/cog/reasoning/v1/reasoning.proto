@@ -61,6 +61,7 @@ enum FindingType {
   SUNK_COST_FALLACY = 11;
   STATUS_QUO_BIAS = 12;
   ORDER_BIAS = 13;
+  CONCEPTUAL_ANCHORING = 14;
 
   // Epistemic hygiene
   CONFIDENCE_MISCALIBRATION = 20;
@@ -222,7 +223,10 @@ message CognitiveAssessment {
   CalibrationDetail calibration = 13;
   // Scope-specific
   ScopeDetail scope = 14;
-  // 15-19 reserved for additional finding-specific details
+  // 15 reserved
+  // Conceptual anchoring-specific (populated only for CONCEPTUAL_ANCHORING findings)
+  ConceptualAnchoringDetail conceptual_anchoring = 16;
+  // 17-19 reserved for additional finding-specific details
 }
 
 // Detail sub-messages for specific finding types.
@@ -260,6 +264,17 @@ message ScopeDetail {
   double drift_distance = 1;               // fuzzy distance from objective
   repeated string current_topics = 2;
   repeated string objective_topics = 3;
+}
+
+// Detail sub-message for CONCEPTUAL_ANCHORING findings.
+// Populated in CognitiveAssessment.conceptual_anchoring (field 16).
+message ConceptualAnchoringDetail {
+  string anchor_claim_text        = 1;  // the first strong assertion (the anchor)
+  uint32 anchor_turn              = 2;  // turn where anchor was set
+  double semantic_orbit_ratio     = 3;  // fraction of subsequent turns with overlap > threshold
+  double avg_semantic_overlap     = 4;  // mean overlap across all subsequent turns
+  uint32 turns_analyzed           = 5;  // total subsequent turns examined
+  bool   counter_claims_acknowledged = 6; // true if any counter-claim was accepted/refined
 }
 
 

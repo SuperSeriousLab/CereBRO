@@ -10,12 +10,13 @@ import (
 type Detector string
 
 const (
-	DetectorAnchoring     Detector = "anchoring-detector"
-	DetectorSunkCost      Detector = "sunk-cost-detector"
-	DetectorContradiction Detector = "contradiction-tracker"
-	DetectorScopeGuard    Detector = "scope-guard"
-	DetectorCalibrator    Detector = "confidence-calibrator"
-	DetectorLedger        Detector = "decision-ledger"
+	DetectorAnchoring             Detector = "anchoring-detector"
+	DetectorSunkCost              Detector = "sunk-cost-detector"
+	DetectorContradiction         Detector = "contradiction-tracker"
+	DetectorScopeGuard            Detector = "scope-guard"
+	DetectorCalibrator            Detector = "confidence-calibrator"
+	DetectorLedger                Detector = "decision-ledger"
+	DetectorConceptualAnchoring   Detector = "conceptual-anchoring-detector"
 )
 
 // RouterConfig holds activation thresholds.
@@ -143,6 +144,27 @@ func Route(snap *reasoningv1.ConversationSnapshot, cfg RouterConfig) RoutingDeci
 	if hasCost {
 		activated = append(activated, DetectorSunkCost)
 		reasons = append(reasons, "cost/investment language detected")
+	}
+
+	// Conceptual Anchoring: activate when conversation has >= 4 turns and any
+	// declarative assertion appears in the early turns (first 3).
+	// This detector runs on both modern and classical text.
+	if nTurns >= 4 {
+		maxScan := 3
+		if int(nTurns) < maxScan {
+			maxScan = int(nTurns)
+		}
+		hasDeclarative := false
+		for i := 0; i < maxScan; i++ {
+			if isStrongDeclarative(turns[i].GetRawText()) {
+				hasDeclarative = true
+				break
+			}
+		}
+		if hasDeclarative {
+			activated = append(activated, DetectorConceptualAnchoring)
+			reasons = append(reasons, "declarative assertion in early turns — conceptual anchor candidate")
+		}
 	}
 
 	return RoutingDecision{Activated: activated, Reasons: reasons}

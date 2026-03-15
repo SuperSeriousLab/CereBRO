@@ -798,6 +798,12 @@ func scopeSeverityFromDrift(drift float64) reasoningv1.FindingSeverity {
 
 type CalibratorConfig struct {
 	MinMiscalibration float64
+	// MinCertaintyWords is the minimum word count a turn must have before
+	// CERTAIN-level confidence markers are counted. Discourse particles
+	// ("Certainly.", "Indeed.") are shorter than real claims.
+	// Default 0 means use the package constant minCertaintyTurnWords (5).
+	// Set to 8 for classical-era text where discourse particles are longer.
+	MinCertaintyWords uint32
 }
 
 func DefaultCalibratorConfig() CalibratorConfig {
@@ -1318,4 +1324,333 @@ func ledgerHasWeakRationale(text string) bool {
 		}
 	}
 	return false
+}
+
+// ============================================================
+// Conceptual Anchoring Detector
+// ============================================================
+
+// ConceptualAnchoringConfig holds thresholds for the conceptual anchoring detector.
+type ConceptualAnchoringConfig struct {
+	AnchorThreshold float64 // min stemmed Jaccard for "high overlap" (default 0.3)
+	OrbitThreshold  float64 // fraction of subsequent turns that must orbit (default 0.6)
+	MinTurns        uint32  // minimum total turns (default 8)
+	MaxAnchorTurns  uint32  // how many early turns to scan for anchor claim (default 3)
+}
+
+// DefaultConceptualAnchoringConfig returns sensible defaults.
+func DefaultConceptualAnchoringConfig() ConceptualAnchoringConfig {
+	return ConceptualAnchoringConfig{
+		AnchorThreshold: 0.3,
+		OrbitThreshold:  0.6,
+		MinTurns:        8,
+		MaxAnchorTurns:  3,
+	}
+}
+
+// hedgeWords are epistemic qualifiers that signal non-declarative claims.
+var hedgeWords = []string{
+	"maybe", "perhaps", "possibly", "might", "could be", "i think",
+	"i believe", "i suppose", "i guess", "i wonder", "not sure",
+	"uncertain", "unclear", "probably", "likely",
+}
+
+// counterAcknowledgements are phrases indicating acceptance of a counter-claim.
+var counterAcknowledgements = []string{
+	"you're right", "youre right", "i concede", "that's a fair point",
+	"thats a fair point", "i revise", "on reflection", "i was wrong",
+	"actually", "fair enough", "good point", "i accept", "you make a good point",
+	"i see your point", "i agree with that", "you've convinced me",
+	"i stand corrected",
+}
+
+// counterReassertions are phrases that immediately negate an acknowledgement.
+var counterReassertions = []string{
+	"but still", "but nevertheless", "but even so", "but regardless",
+	"however i still", "but i maintain", "but i still", "but my point stands",
+}
+
+// isStrongDeclarative returns true if the text is a high-confidence declarative
+// claim with no hedge words, not a question, and of sufficient length.
+func isStrongDeclarative(text string) bool {
+	lower := strings.ToLower(textutil.NormalizeQuotes(text))
+
+	// Must not be a question
+	trimmed := strings.TrimSpace(text)
+	if strings.HasSuffix(trimmed, "?") {
+		return false
+	}
+	// No interrogative opener
+	for _, opener := range []string{"what ", "who ", "how ", "when ", "where ", "why ", "is it ", "are you ", "do you "} {
+		if strings.HasPrefix(lower, opener) {
+			return false
+		}
+	}
+
+	// Minimum word count
+	words := strings.Fields(text)
+	if len(words) < 6 {
+		return false
+	}
+
+	// Must not contain hedge words
+	for _, hedge := range hedgeWords {
+		if strings.Contains(lower, hedge) {
+			return false
+		}
+	}
+
+	// Must contain a declarative copula or strong assertion verb
+	declarativeMarkers := []string{
+		" is ", " are ", " must ", " always ", " never ", " only ",
+		" will ", " shall ", " does ", " do ",
+	}
+	for _, marker := range declarativeMarkers {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+
+	// Allow starts like "Justice is..." or "The X is Y..."
+	if strings.HasPrefix(lower, "the ") || strings.HasPrefix(lower, "justice") ||
+		strings.HasPrefix(lower, "truth") || strings.HasPrefix(lower, "virtue") {
+		return true
+	}
+
+	return false
+}
+
+// stemmedJaccard computes the Jaccard similarity between two sets of stemmed keywords.
+// Returns overlap / union (0.0 if both sets are empty).
+func stemmedJaccard(anchorKWs map[string]bool, turnText string) float64 {
+	turnKWs := extractKeywords(turnText)
+	if len(turnKWs) == 0 || len(anchorKWs) == 0 {
+		return 0.0
+	}
+
+	intersection := 0
+	for _, kw := range turnKWs {
+		if anchorKWs[kw] {
+			intersection++
+		}
+	}
+	// Union = |A| + |B| - |A ∩ B|
+	union := len(anchorKWs) + len(turnKWs) - intersection
+	if union == 0 {
+		return 0.0
+	}
+	return float64(intersection) / float64(union)
+}
+
+// hasAcknowledgedCounter returns true if any turn after anchorTurnNum contains
+// an acknowledgement signal without an immediate reassertion.
+func hasAcknowledgedCounter(turns []*reasoningv1.Turn, anchorTurnNum uint32) bool {
+	for _, turn := range turns {
+		if turn.GetTurnNumber() <= anchorTurnNum {
+			continue
+		}
+		lower := strings.ToLower(textutil.NormalizeQuotes(turn.GetRawText()))
+		for _, ack := range counterAcknowledgements {
+			if strings.Contains(lower, ack) {
+				// Check there's no immediate reassertion in the same turn
+				hasReassert := false
+				for _, reassert := range counterReassertions {
+					if strings.Contains(lower, reassert) {
+						hasReassert = true
+						break
+					}
+				}
+				if !hasReassert {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// conceptualAnchoringConfidence computes a composite confidence score.
+// orbit_ratio weight 0.5, avg_overlap weight 0.3, sample_size weight 0.2 (capped at n=15).
+func conceptualAnchoringConfidence(orbitRatio, avgOverlap float64, n uint32) float64 {
+	sampleNorm := math.Min(float64(n)/15.0, 1.0)
+	return clamp(0.5*orbitRatio+0.3*avgOverlap+0.2*sampleNorm, 0.0, 1.0)
+}
+
+func conceptualAnchoringSeverity(confidence float64) reasoningv1.FindingSeverity {
+	if confidence >= 0.75 {
+		return reasoningv1.FindingSeverity_WARNING
+	}
+	if confidence >= 0.55 {
+		return reasoningv1.FindingSeverity_CAUTION
+	}
+	return reasoningv1.FindingSeverity_INFO
+}
+
+// truncateText truncates s to maxLen characters, appending "..." if truncated.
+func truncateText(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
+}
+
+// DetectConceptualAnchoring detects when an early strong claim sets a conceptual
+// frame that all subsequent argument orbits, rather than evaluating alternatives.
+// This is the propositional variant of anchoring — distinct from numeric anchoring.
+// It should run on classical text (NOT skipped by DomainContext classical mode).
+func DetectConceptualAnchoring(snap *reasoningv1.ConversationSnapshot, cfg ConceptualAnchoringConfig) *reasoningv1.CognitiveAssessment {
+	if snap == nil {
+		return nil
+	}
+
+	turns := snap.GetTurns()
+	if uint32(len(turns)) < cfg.MinTurns {
+		return nil
+	}
+
+	// === Step 1: Find the anchor candidate ===
+	// Scan the first MaxAnchorTurns turns for the strongest declarative assertion.
+	maxScan := int(cfg.MaxAnchorTurns)
+	if maxScan > len(turns) {
+		maxScan = len(turns)
+	}
+
+	var anchorTurn *reasoningv1.Turn
+	var anchorKWs map[string]bool
+
+	for i := 0; i < maxScan; i++ {
+		t := turns[i]
+		if isStrongDeclarative(t.GetRawText()) {
+			anchorTurn = t
+			kws := extractKeywords(t.GetRawText())
+			anchorKWs = make(map[string]bool, len(kws))
+			for _, kw := range kws {
+				anchorKWs[kw] = true
+			}
+			break
+		}
+	}
+
+	if anchorTurn == nil || len(anchorKWs) == 0 {
+		return nil // No strong declarative anchor found
+	}
+
+	// === Step 2: Compute semantic orbit for subsequent turns ===
+	var subsequent []*reasoningv1.Turn
+	for _, t := range turns {
+		if t.GetTurnNumber() > anchorTurn.GetTurnNumber() {
+			subsequent = append(subsequent, t)
+		}
+	}
+
+	if uint32(len(subsequent)) < 1 {
+		return nil
+	}
+
+	var overlapScores []float64
+	orbitCount := 0
+
+	for _, t := range subsequent {
+		text := t.GetRawText()
+		if strings.TrimSpace(text) == "" {
+			continue
+		}
+		overlap := stemmedJaccard(anchorKWs, text)
+		overlapScores = append(overlapScores, overlap)
+		if overlap >= cfg.AnchorThreshold {
+			orbitCount++
+		}
+	}
+
+	if len(overlapScores) == 0 {
+		return nil
+	}
+
+	orbitRatio := float64(orbitCount) / float64(len(overlapScores))
+
+	var sumOverlap float64
+	for _, s := range overlapScores {
+		sumOverlap += s
+	}
+	avgOverlap := sumOverlap / float64(len(overlapScores))
+
+	// === Step 3: Check for counter-claim acknowledgement ===
+	counterAcknowledged := hasAcknowledgedCounter(turns, anchorTurn.GetTurnNumber())
+
+	// === Step 4: Threshold check ===
+	if orbitRatio < cfg.OrbitThreshold {
+		return nil
+	}
+	if counterAcknowledged {
+		return nil
+	}
+
+	// === Step 5: Build finding ===
+	confidence := conceptualAnchoringConfidence(orbitRatio, avgOverlap, uint32(len(subsequent)))
+	severity := conceptualAnchoringSeverity(confidence)
+
+	relevantTurns := []uint32{anchorTurn.GetTurnNumber()}
+	for _, t := range subsequent {
+		relevantTurns = append(relevantTurns, t.GetTurnNumber())
+	}
+
+	explanation := strings.Join([]string{
+		"Anchor set at turn ",
+		uintToString(anchorTurn.GetTurnNumber()),
+		": '",
+		truncateText(anchorTurn.GetRawText(), 80),
+		"'. ",
+		uintToString(uint32(orbitCount)),
+		"/",
+		uintToString(uint32(len(subsequent))),
+		" subsequent turns orbit the anchor",
+		" (avg overlap ",
+		formatFloat(avgOverlap),
+		"). No counter-claims acknowledged.",
+	}, "")
+
+	return &reasoningv1.CognitiveAssessment{
+		FindingType:   reasoningv1.FindingType_CONCEPTUAL_ANCHORING,
+		Severity:      severity,
+		Explanation:   explanation,
+		RelevantTurns: relevantTurns,
+		Confidence:    confidence,
+		DetectorName:  "conceptual-anchoring-detector",
+		ConceptualAnchoring: &reasoningv1.ConceptualAnchoringDetail{
+			AnchorClaimText:          anchorTurn.GetRawText(),
+			AnchorTurn:               anchorTurn.GetTurnNumber(),
+			SemanticOrbitRatio:       orbitRatio,
+			AvgSemanticOverlap:       avgOverlap,
+			TurnsAnalyzed:            uint32(len(subsequent)),
+			CounterClaimsAcknowledged: counterAcknowledged,
+		},
+	}
+}
+
+// uintToString converts a uint32 to its decimal string representation
+// without importing fmt (keeps the function dependency-free).
+func uintToString(n uint32) string {
+	if n == 0 {
+		return "0"
+	}
+	buf := make([]byte, 0, 10)
+	for n > 0 {
+		buf = append([]byte{byte('0' + n%10)}, buf...)
+		n /= 10
+	}
+	return string(buf)
+}
+
+// formatFloat formats a float64 to 2 decimal places as a string.
+func formatFloat(f float64) string {
+	// Simple integer + 2-decimal formatter to avoid fmt import
+	scaled := int64(f*100 + 0.5)
+	intPart := scaled / 100
+	fracPart := scaled % 100
+	s := uintToString(uint32(intPart)) + "."
+	if fracPart < 10 {
+		s += "0"
+	}
+	s += uintToString(uint32(fracPart))
+	return s
 }
