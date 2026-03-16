@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 COUNT=${1:-50}
 OUTPUT_DIR=${2:-"data/generation/output/$(date +%Y-%m-%d)"}
@@ -18,11 +18,11 @@ for i in $(seq 1 "$COUNT"); do
     OUT_FILE="$OUTPUT_DIR/${PROMPT_NAME}-$(printf '%03d' $i).json"
 
     # Resume support
-    [[ -f "$OUT_FILE" ]] && { ((GENERATED++)); continue; }
+    [[ -f "$OUT_FILE" ]] && { GENERATED=$((GENERATED + 1)); continue; }
 
     SYSTEM_PROMPT=$(cat "$PROMPT_FILE")
 
-    RESPONSE=$(curl -s --max-time 120 -X POST "$SLR_ENDPOINT/v1/chat/completions" \
+    RESPONSE=$(curl -s --max-time 180 -X POST "$SLR_ENDPOINT/v1/chat/completions" \
       -H "Content-Type: application/json" \
       -d "$(jq -n \
         --arg sys "$SYSTEM_PROMPT" \
@@ -34,15 +34,22 @@ for i in $(seq 1 "$COUNT"); do
             {"role": "user", "content": $usr}
           ],
           "temperature": 0.8,
-          "max_tokens": 2048
+          "max_tokens": 4096
         }')" 2>/dev/null)
 
     # Extract the content from OpenAI-compatible response
     CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // empty' 2>/dev/null)
 
     if [[ -n "$CONTENT" ]]; then
-        echo "$CONTENT" > "$OUT_FILE"
-        ((GENERATED++))
+        # Strip markdown code fences if present
+        CLEAN=$(echo "$CONTENT" | sed '/^```/d')
+        # Validate JSON before writing — skip truncated responses
+        if echo "$CLEAN" | jq '.' > /dev/null 2>&1; then
+            echo "$CLEAN" > "$OUT_FILE"
+            GENERATED=$((GENERATED + 1))
+        else
+            echo "WARN: invalid/truncated JSON for $PROMPT_NAME-$i — skipping" >&2
+        fi
     else
         echo "WARN: empty response for $PROMPT_NAME-$i" >&2
     fi

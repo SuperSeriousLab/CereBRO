@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 INPUT_DIR="${1:?Usage: convert-to-snapshots.sh INPUT_DIR OUTPUT_DIR}"
 OUTPUT_DIR="${2:?Usage: convert-to-snapshots.sh INPUT_DIR OUTPUT_DIR}"
@@ -17,16 +17,14 @@ for f in "$INPUT_DIR"/*.json; do
     # The LLM output may have the JSON embedded in markdown code blocks
     CONTENT=$(cat "$f")
 
-    # Strip markdown code fences if present
-    CONTENT=$(echo "$CONTENT" | sed -n '/^```/,/^```/p' | sed '/^```/d' || echo "$CONTENT")
-    # If no code fences, use raw content
-    [[ -z "$CONTENT" ]] && CONTENT=$(cat "$f")
+    # Strip markdown code fences if present (defensive — generator should strip at write time)
+    CONTENT=$(echo "$CONTENT" | sed '/^```/d')
 
     # Extract turns array
     TURNS=$(echo "$CONTENT" | jq -c '.turns // empty' 2>/dev/null)
     if [[ -z "$TURNS" ]] || [[ "$TURNS" == "null" ]]; then
         echo "SKIP: $BASENAME (no turns array)" >&2
-        ((SKIPPED++))
+        SKIPPED=$((SKIPPED + 1))
         continue
     fi
 
@@ -54,10 +52,10 @@ for f in "$INPUT_DIR"/*.json; do
         }' > "$OUT" 2>/dev/null
 
     if [[ $? -eq 0 ]]; then
-        ((CONVERTED++))
+        CONVERTED=$((CONVERTED + 1))
     else
         echo "SKIP: $BASENAME (jq conversion failed)" >&2
-        ((SKIPPED++))
+        SKIPPED=$((SKIPPED + 1))
     fi
 done
 
