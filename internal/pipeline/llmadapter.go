@@ -7,6 +7,7 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	llmclient "github.com/SuperSeriousLab/eidos-llm/client"
@@ -15,11 +16,15 @@ import (
 // DefaultEidosLLMConfig returns the standard eidos-llm client configuration.
 // Fallback chain: SLR (192.168.14.69:8081) → Grok (XAI_API_KEY) → Ollama (10.70.70.14).
 func DefaultEidosLLMConfig() llmclient.Config {
+	ollamaEndpoint := os.Getenv("EIDOS_OLLAMA_HOST")
+	if ollamaEndpoint == "" {
+		ollamaEndpoint = "http://10.70.70.14:11434"
+	}
 	return llmclient.Config{
 		SLREndpoint:    "http://192.168.14.69:8081",
 		GrokEndpoint:   "https://api.x.ai/v1/chat/completions",
 		GrokAPIKeyEnv:  "XAI_API_KEY",
-		OllamaEndpoint: "http://10.70.70.14:11434",
+		OllamaEndpoint: ollamaEndpoint,
 		OllamaModel:    "glm-4.7-flash:q4_K_M",
 		Timeout:        30 * time.Second,
 	}

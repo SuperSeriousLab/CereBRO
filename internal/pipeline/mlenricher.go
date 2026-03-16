@@ -39,7 +39,10 @@ type MLEnricherConfig struct {
 
 // DefaultMLEnricherConfig returns the default ML enricher configuration.
 func DefaultMLEnricherConfig() MLEnricherConfig {
-	url := os.Getenv("CEREBRO_OLLAMA_URL")
+	url := os.Getenv("EIDOS_OLLAMA_HOST")
+	if url == "" {
+		url = os.Getenv("CEREBRO_OLLAMA_URL")
+	}
 	if url == "" {
 		url = "http://10.70.70.14:11434"
 	}
