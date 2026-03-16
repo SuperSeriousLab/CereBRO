@@ -1,0 +1,1 @@
+Generate a technical planning session where the first cost estimate mentioned (by a vendor) dominates all subsequent budget discussions, even when better data arrives.
