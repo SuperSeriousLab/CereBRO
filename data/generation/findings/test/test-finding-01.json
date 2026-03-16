@@ -1,0 +1,6 @@
+{
+    "conversation_text": "Alice: We've already spent $2M on this project. Bob: I know, but the new data shows it won't work. Alice: But we can't just throw away $2M! Bob: That's the sunk cost fallacy.",
+    "finding_type": "SUNK_COST_FALLACY",
+    "confidence": 0.85,
+    "explanation": "Alice cites prior investment as reason to continue despite new evidence."
+}

@@ -1,0 +1,18 @@
+You are verifying a cognitive analysis finding. A detection system analyzed a conversation and reported a finding. Your job is to independently assess whether the finding is correct.
+
+CONVERSATION:
+{{CONVERSATION_TEXT}}
+
+FINDING:
+Type: {{FINDING_TYPE}}
+Confidence: {{CONFIDENCE}}
+Explanation: {{EXPLANATION}}
+
+Does this conversation genuinely exhibit {{FINDING_TYPE}}?
+
+Reply with exactly one of:
+AGREE - the finding is correct, the pattern is clearly present
+DISAGREE - the finding is wrong, the pattern is not present
+UNCERTAIN - the pattern may be partially present but the finding is debatable
+
+Then one sentence explaining why.
