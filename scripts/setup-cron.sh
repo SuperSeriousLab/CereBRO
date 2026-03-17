@@ -4,9 +4,9 @@ set -euo pipefail
 CEREBRO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 USER_HOME=$(eval echo ~$USER)
 
-echo "This will install two cron entries:"
-echo "  1. Nightly loop at 2:00 AM (50 conversations)"
-echo "  2. Watchdog at 5:00 AM (3-hour buffer)"
+echo "This will install two cron entries (times in CET/CEST, system runs UTC):"
+echo "  1. Nightly loop at 2:00 AM CET (1:00 UTC in winter, 0:00 UTC in summer)"
+echo "  2. Watchdog at 5:00 AM CET (4:00 UTC in winter, 3:00 UTC in summer)"
 echo ""
 echo "CereBRO dir: $CEREBRO_DIR"
 echo ""
@@ -19,10 +19,10 @@ EXISTING=$(crontab -l 2>/dev/null | grep -v 'nightly-loop\|nightly-watchdog' || 
 
 # Add new entries
 echo "$EXISTING
-# CereBRO Nightly Lamarckian Loop (installed $(date +%Y-%m-%d))
-0 2 * * * $CEREBRO_DIR/scripts/nightly-loop.sh 50 >> $CEREBRO_DIR/data/generation/logs/cron.log 2>&1
-# CereBRO Watchdog (3h after loop)
-0 5 * * * $CEREBRO_DIR/scripts/nightly-watchdog.sh >> $CEREBRO_DIR/data/generation/logs/watchdog.log 2>&1
+# CereBRO Nightly Lamarckian Loop — 2:00 AM CET = 1:00 UTC (winter) / 0:00 UTC (summer)
+0 1 * * * $CEREBRO_DIR/scripts/nightly-loop.sh 50 >> $CEREBRO_DIR/data/generation/logs/cron.log 2>&1
+# CereBRO Watchdog — 5:00 AM CET = 4:00 UTC (winter) / 3:00 UTC (summer)
+0 4 * * * $CEREBRO_DIR/scripts/nightly-watchdog.sh >> $CEREBRO_DIR/data/generation/logs/watchdog.log 2>&1
 " | crontab -
 
 echo ""

@@ -76,6 +76,13 @@ log_error() {
     ((PHASE_ERRORS++)) || true
 }
 
+pts_notify() {
+  local msg="$1"
+  curl -s -X POST http://192.168.14.68:9746/inject \
+    -H "Content-Type: application/json" \
+    -d "$(jq -n --arg text "$msg" '{text: $text}')" > /dev/null 2>&1 &
+}
+
 # Write the morning report — always called, even on failure.
 write_morning_report() {
     local end_time
@@ -173,6 +180,7 @@ fi
 if [[ "$CONVS_GENERATED" -eq 0 ]]; then
     ABORT_REASON="zero conversations generated"
     log_phase "GENERATE" "ABORT: nothing to process"
+    pts_notify "CereBRO nightly: Phase 3 generated 0 conversations. SLR endpoint may be down."
     exit 1
 fi
 
@@ -222,6 +230,7 @@ if [[ "$SNAPS_CONVERTED" -gt 0 ]]; then
         log_error "PROCESS" "cerebro-batch exited non-zero"
         FINDINGS_TOTAL=$(ls "$FIND_DIR"/*.json 2>/dev/null | grep -v summary.json | wc -l)
         CANDIDATES_TOTAL=$(ls "$CAND_DIR"/*.json 2>/dev/null | wc -l)
+        pts_notify "CereBRO nightly: Phase 5 batch processing failed (cerebro-batch exited non-zero). Findings: $FINDINGS_TOTAL, Candidates: $CANDIDATES_TOTAL."
     fi
 fi
 
@@ -238,6 +247,7 @@ if [[ "$CANDIDATES_TOTAL" -gt 0 ]]; then
         log_error "VERIFY" "verify-findings.sh exited non-zero"
         VERIFIED_DIR="$CEREBRO_DIR/data/generation/verified/$DATE"
         VERIFIED_COUNT=$(ls "$VERIFIED_DIR"/*.json 2>/dev/null | wc -l)
+        pts_notify "CereBRO nightly: Phase 6 Grok verification failed (verify-findings.sh exited non-zero). Verified so far: $VERIFIED_COUNT."
     fi
 else
     log_phase "VERIFY" "No candidates to verify — skipping"
@@ -279,6 +289,7 @@ if [[ "$CORPUS_GROWTH" -gt 0 ]]; then
     else
         log_error "FORGE" "forge-sweep.sh exited non-zero"
         FORGE_RAN=0
+        pts_notify "CereBRO nightly: Phase 8 forge sweep regression detected (forge-sweep.sh exited non-zero). Corpus growth: $CORPUS_GROWTH entries."
     fi
 else
     log_phase "FORGE" "Corpus unchanged — skipping forge sweep"

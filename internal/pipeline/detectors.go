@@ -131,6 +131,7 @@ var sunkCostPhrases = []string{
 	"the definition we gave", "what we agreed upon", "to which i agreed",
 	"as he maintained", "as they maintained", "as is maintained",
 	"for so said", "it were unjust to abandon",
+	"as he says", "as simonides says", "as he rightly said", "his words are true",
 	// Phrases that actually appear in Plato's Republic (Jowett translation):
 	"i still stand by", "stand by the latter", "heir of the argument",
 	"what did simonides say", "simonides say",
@@ -819,6 +820,9 @@ var confidenceKeywords = []struct {
 		keywords: []string{
 			"definitely", "certainly", "i'm sure", "i\u2019m sure",
 			"absolutely", "without a doubt", "100%",
+			// Classical speech-act markers: used by Thrasymachus to assert claims
+			// as established fact rather than as hedged beliefs.
+			"i assert", "i maintain", "i say confidently",
 		},
 	},
 	{

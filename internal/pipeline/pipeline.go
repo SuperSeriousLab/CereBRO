@@ -48,6 +48,15 @@ type PipelineConfig struct {
 	SophrimFeedbackEndpoint string  // if non-empty, send retrieval quality feedback after pipeline
 	GroundingFactIDs        []int64 // fact IDs from Sophrim grounding
 	GroundingQuery          string  // original query used for grounding
+
+	// PTSEndpoint is the base URL for the Problem Tracking System.
+	// When non-empty, anomalous pipeline results (score=0, low confidence,
+	// metacognitive review flag, Layer 0 rejection) are reported via POST
+	// /cog/signal in a fire-and-forget goroutine.
+	// Example: "http://192.168.14.68:9746"
+	// Override via PTS_ENDPOINT environment variable at process startup, or
+	// set directly when constructing PipelineConfig.
+	PTSEndpoint string
 }
 
 // DefaultPipelineConfig returns all-default detector configurations.
@@ -108,10 +117,13 @@ func Run(snap *reasoningv1.ConversationSnapshot, cfg PipelineConfig) *PipelineRe
 	if cfg.UseLayer0 {
 		l0 := RunLayer0(snap, cfg.Layer0)
 		if !l0.Accepted {
-			return &PipelineResult{
+			rejected := &PipelineResult{
 				Layer0:   l0,
 				Rejected: true,
 			}
+			// PTS anomaly signal for Layer 0 rejection (fire-and-forget).
+			maybeSendPTSSignals(rejected, cfg.PTSEndpoint)
+			return rejected
 		}
 	}
 
@@ -282,6 +294,11 @@ func Run(snap *reasoningv1.ConversationSnapshot, cfg PipelineConfig) *PipelineRe
 		}
 		go sender.SendFeedback(context.Background(), cfg.GroundingQuery, cfg.GroundingFactIDs, signal, fbContext)
 	}
+
+	// Stage 10: PTS Anomaly Signals (fire-and-forget)
+	// Report zero-score, low-confidence, or metacognitive-review-flagged results
+	// to the Problem Tracking System for human triage.
+	maybeSendPTSSignals(result, cfg.PTSEndpoint)
 
 	return result
 }

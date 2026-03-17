@@ -1,0 +1,106 @@
+{
+  "republic-b1-thr-001": [
+    "ANCHORING_BIAS",
+    "CONFIDENCE_MISCALIBRATION"
+  ],
+  "republic-b1-thr-002": [
+    "ANCHORING_BIAS",
+    "CONFIDENCE_MISCALIBRATION"
+  ],
+  "republic-b1-thr-003": [
+    "ANCHORING_BIAS",
+    "CONFIDENCE_MISCALIBRATION"
+  ],
+  "republic-b1-thr-004": [
+    "CONTRADICTION",
+    "ANCHORING_BIAS",
+    "CONFIDENCE_MISCALIBRATION"
+  ],
+  "republic-b1-thr-005": [
+    "CONTRADICTION",
+    "ANCHORING_BIAS",
+    "CONFIDENCE_MISCALIBRATION"
+  ],
+  "republic-b1-thr-006": [
+    "CONTRADICTION",
+    "ANCHORING_BIAS",
+    "CONFIDENCE_MISCALIBRATION"
+  ],
+  "republic-b1-thr-007": [
+    "CONTRADICTION",
+    "ANCHORING_BIAS",
+    "CONFIDENCE_MISCALIBRATION"
+  ],
+  "republic-b1-thr-008": [
+    "CONTRADICTION",
+    "ANCHORING_BIAS",
+    "CONFIDENCE_MISCALIBRATION"
+  ],
+  "republic-b1-thr-009": [
+    "CONTRADICTION",
+    "ANCHORING_BIAS",
+    "CONFIDENCE_MISCALIBRATION"
+  ],
+  "republic-b1-thr-010": [
+    "CONTRADICTION",
+    "ANCHORING_BIAS",
+    "CONFIDENCE_MISCALIBRATION"
+  ],
+  "republic-b1-thr-011": [
+    "CONTRADICTION",
+    "ANCHORING_BIAS",
+    "CONFIDENCE_MISCALIBRATION"
+  ],
+  "republic-b1-thr-012": [
+    "CONTRADICTION",
+    "CONFIDENCE_MISCALIBRATION"
+  ],
+  "republic-b1-thr-013": [
+    "CONTRADICTION",
+    "CONFIDENCE_MISCALIBRATION"
+  ],
+  "republic-b1-thr-014": [
+    "CONTRADICTION",
+    "SCOPE_DRIFT"
+  ],
+  "republic-b1-thr-015": [
+    "CONTRADICTION",
+    "SCOPE_DRIFT"
+  ],
+  "republic-b1-thr-016": [
+    "CONTRADICTION",
+    "SCOPE_DRIFT"
+  ],
+  "republic-b1-thr-017": [
+    "CONTRADICTION",
+    "SCOPE_DRIFT"
+  ],
+  "republic-b1-thr-018": [
+    "CONTRADICTION",
+    "SCOPE_DRIFT"
+  ],
+  "republic-b1-thr-019": [
+    "SCOPE_DRIFT"
+  ],
+  "republic-b1-thr-020": [
+    "SCOPE_DRIFT"
+  ],
+  "republic-b1-thr-021": [
+    "SCOPE_DRIFT"
+  ],
+  "republic-b1-thr-022": [
+    "SCOPE_DRIFT"
+  ],
+  "republic-b1-thr-023": [
+    "SCOPE_DRIFT"
+  ],
+  "republic-b1-thr-024": [
+    "SCOPE_DRIFT"
+  ],
+  "republic-b1-thr-025": [
+    "SCOPE_DRIFT"
+  ],
+  "republic-b1-thr-026": [
+    "SCOPE_DRIFT"
+  ]
+}
