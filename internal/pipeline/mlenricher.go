@@ -37,18 +37,35 @@ type MLEnricherConfig struct {
 	LLMCaller LLMCaller
 }
 
+const (
+	// defaultSLREndpoint is the primary LLM gateway endpoint.
+	// Override with EIDOS_SLR_HOST environment variable.
+	defaultSLREndpoint = "http://192.168.14.69:8081"
+
+	// defaultSLRModel tells SLR to choose the appropriate tier automatically.
+	defaultSLRModel = "slr-auto"
+
+	// defaultOllamaEndpoint is the direct Ollama endpoint used as fallback
+	// when SLR is unavailable and no LLMCaller is configured.
+	defaultOllamaEndpoint = "http://10.70.70.14:11434"
+)
+
 // DefaultMLEnricherConfig returns the default ML enricher configuration.
+// Primary LLM path: SLR gateway (http://192.168.14.69:8081) via LLMCaller.
+// Legacy direct-Ollama path: used only when LLMCaller is nil (OllamaURL field).
 func DefaultMLEnricherConfig() MLEnricherConfig {
-	url := os.Getenv("EIDOS_OLLAMA_HOST")
-	if url == "" {
-		url = os.Getenv("CEREBRO_OLLAMA_URL")
+	// OllamaURL is the Ollama fallback endpoint for the legacy callOllama path.
+	// Prefer the LLMCaller field (EidosLLMCaller) for SLR-routed calls.
+	ollamaURL := os.Getenv("EIDOS_OLLAMA_HOST")
+	if ollamaURL == "" {
+		ollamaURL = os.Getenv("CEREBRO_OLLAMA_URL")
 	}
-	if url == "" {
-		url = "http://10.70.70.14:11434"
+	if ollamaURL == "" {
+		ollamaURL = defaultOllamaEndpoint
 	}
 	return MLEnricherConfig{
-		OllamaURL:      url,
-		Model:          "glm-4.7-flash:q4_K_M",
+		OllamaURL:      ollamaURL,
+		Model:          defaultSLRModel,
 		TimeoutPerTurn: 5000 * time.Millisecond,
 		MaxRetries:     1,
 		FallbackToPure: true,

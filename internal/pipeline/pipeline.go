@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	cerebrov1 "github.com/SuperSeriousLab/CereBRO/gen/go/cerebro/v1"
 	reasoningv1 "github.com/SuperSeriousLab/CereBRO/gen/go/cog/reasoning/v1"
 )
@@ -57,6 +59,13 @@ type PipelineConfig struct {
 	// Override via PTS_ENDPOINT environment variable at process startup, or
 	// set directly when constructing PipelineConfig.
 	PTSEndpoint string
+
+	// Logger is an optional zerolog.Logger for structured training data events.
+	// When set, a single "cerebro_pipeline_run" Info event is emitted at the
+	// end of every Run() call with full pipeline telemetry.
+	// Use zerolog.Nop() (or leave as zero value — same effect) to disable logging.
+	// Logging is skipped when Logger.GetLevel() == zerolog.Disabled.
+	Logger zerolog.Logger
 }
 
 // DefaultPipelineConfig returns all-default detector configurations.
@@ -300,6 +309,77 @@ func Run(snap *reasoningv1.ConversationSnapshot, cfg PipelineConfig) *PipelineRe
 	// to the Problem Tracking System for human triage.
 	maybeSendPTSSignals(result, cfg.PTSEndpoint)
 
+	// Stage 11: Training data log event (optional — zero Logger = no-op).
+	// Emits one structured event per Run() with full pipeline telemetry for
+	// offline analysis, dataset construction, and performance tracking.
+	if cfg.Logger.GetLevel() != zerolog.Disabled {
+		// Collect finding types and confidences from raw findings (pre-inhibition).
+		ftypes := make([]string, len(result.Findings))
+		fconfs := make([]float64, len(result.Findings))
+		for i, f := range result.Findings {
+			ftypes[i] = f.GetFindingType().String()
+			fconfs[i] = f.GetConfidence()
+		}
+
+		// Count findings after inhibition (post-gating).
+		afterInhibition := len(result.Findings)
+		if result.Inhibition != nil {
+			afterInhibition = len(result.Inhibition.Gated)
+		}
+
+		// Count findings after salience filter.
+		afterSalience := afterInhibition
+		if result.Salience != nil {
+			afterSalience = len(result.Salience.Salient)
+		}
+
+		// Aggregate metrics — safe when report is nil (rejected early).
+		var integrityScore float64
+		var criticalCount, warningCount, cautionCount uint32
+		if result.Report != nil {
+			integrityScore = result.Report.GetOverallIntegrityScore()
+			criticalCount = result.Report.GetCriticalCount()
+			warningCount = result.Report.GetWarningCount()
+			cautionCount = result.Report.GetCautionCount()
+		}
+
+		// Self-confidence score — zero when metacognition was not enabled.
+		var selfConfScore float64
+		if result.SelfConf != nil {
+			selfConfScore = result.SelfConf.GetOverallConfidence()
+		}
+
+		// Feedback applied flag.
+		fbApplied := result.Feedback != nil && result.Feedback.Applied
+
+		// Total text length across all turns.
+		var totalTextLen int
+		for _, t := range snap.GetTurns() {
+			totalTextLen += len(t.GetRawText())
+		}
+
+		cfg.Logger.Info().
+			Str("event", "cerebro_pipeline_run").
+			Int("message_count", int(snap.GetTotalTurns())).
+			Int("total_text_length", totalTextLen).
+			Strs("detectors_activated", routingActivatedNames(result.Routing)).
+			Int("findings_raw", len(result.Findings)).
+			Int("findings_after_inhibition", afterInhibition).
+			Int("findings_after_salience", afterSalience).
+			Strs("finding_types", ftypes).
+			Floats64("finding_confidences", fconfs).
+			Float64("integrity_score", integrityScore).
+			Uint32("critical_count", criticalCount).
+			Uint32("warning_count", warningCount).
+			Uint32("caution_count", cautionCount).
+			Bool("ml_enricher_enabled", cfg.MLEnricher.Enabled).
+			Int("ml_enrichments_count", len(result.MLEnrichments)).
+			Float64("self_confidence", selfConfScore).
+			Bool("feedback_applied", fbApplied).
+			Bool("consolidated", result.Consolidated).
+			Msg("pipeline: run logged")
+	}
+
 	return result
 }
 
@@ -414,6 +494,15 @@ func buildDetectorMap(cfg PipelineConfig) map[Detector]DetectorFunc {
 	}
 
 	return m
+}
+
+// routingActivatedNames converts []Detector to []string for zerolog Strs().
+func routingActivatedNames(r RoutingDecision) []string {
+	names := make([]string, len(r.Activated))
+	for i, d := range r.Activated {
+		names[i] = string(d)
+	}
+	return names
 }
 
 // ToCerebroReport converts a PipelineResult into the proto CerebroReport message.

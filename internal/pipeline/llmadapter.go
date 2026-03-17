@@ -14,14 +14,19 @@ import (
 )
 
 // DefaultEidosLLMConfig returns the standard eidos-llm client configuration.
-// Fallback chain: SLR (192.168.14.69:8081) → Grok (XAI_API_KEY) → Ollama (10.70.70.14).
+// Primary: SLR gateway (EIDOS_SLR_HOST or 192.168.14.69:8081).
+// Fallback chain: SLR → Grok (XAI_API_KEY) → Ollama (EIDOS_OLLAMA_HOST or 10.70.70.14).
 func DefaultEidosLLMConfig() llmclient.Config {
+	slrEndpoint := os.Getenv("EIDOS_SLR_HOST")
+	if slrEndpoint == "" {
+		slrEndpoint = "http://192.168.14.69:8081"
+	}
 	ollamaEndpoint := os.Getenv("EIDOS_OLLAMA_HOST")
 	if ollamaEndpoint == "" {
 		ollamaEndpoint = "http://10.70.70.14:11434"
 	}
 	return llmclient.Config{
-		SLREndpoint:    "http://192.168.14.69:8081",
+		SLREndpoint:    slrEndpoint,
 		GrokEndpoint:   "https://api.x.ai/v1/chat/completions",
 		GrokAPIKeyEnv:  "XAI_API_KEY",
 		OllamaEndpoint: ollamaEndpoint,
@@ -39,10 +44,11 @@ type EidosLLMCaller struct {
 }
 
 // NewEidosLLMCaller creates a new EidosLLMCaller with the given config.
-// model is forwarded to SLR for routing (e.g. "auto", "local", or a specific model name).
+// model is forwarded to SLR for routing (e.g. "slr-auto", "slr-local", or a specific model name).
+// Use "slr-auto" to let SLR choose the appropriate tier automatically.
 func NewEidosLLMCaller(cfg llmclient.Config, model string) *EidosLLMCaller {
 	if model == "" {
-		model = "auto"
+		model = "slr-auto"
 	}
 	return &EidosLLMCaller{
 		client: llmclient.New(cfg),
