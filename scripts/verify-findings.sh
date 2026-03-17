@@ -1,13 +1,14 @@
 #!/bin/bash
 set -euo pipefail
 
+CEREBRO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 DATE=${1:-$(date +%Y-%m-%d)}
-FINDINGS_DIR="data/generation/findings/$DATE"
-VERIFIED_DIR="data/generation/verified/$DATE"
-DISAGREED_DIR="data/generation/disagreements/$DATE"
-UNCERTAIN_DIR="data/generation/uncertain/$DATE"
+FINDINGS_DIR="$CEREBRO_DIR/data/generation/findings/$DATE"
+VERIFIED_DIR="$CEREBRO_DIR/data/generation/verified/$DATE"
+DISAGREED_DIR="$CEREBRO_DIR/data/generation/disagreements/$DATE"
+UNCERTAIN_DIR="$CEREBRO_DIR/data/generation/uncertain/$DATE"
 SLR_ENDPOINT="${SLR_ENDPOINT:-http://192.168.14.69:8081}"
-PROMPT_TEMPLATE="data/generation/verify-prompt.txt"
+PROMPT_TEMPLATE="$CEREBRO_DIR/data/generation/verify-prompt.txt"
 
 mkdir -p "$VERIFIED_DIR" "$DISAGREED_DIR" "$UNCERTAIN_DIR"
 
