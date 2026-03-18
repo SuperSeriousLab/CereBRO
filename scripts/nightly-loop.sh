@@ -159,6 +159,7 @@ log_phase "PREFLIGHT" "Checking services..."
 if ! "$CEREBRO_DIR/scripts/preflight-check.sh" 2>&1 | tee -a "$PHASES_LOG"; then
     ABORT_REASON="preflight failed"
     log_phase "PREFLIGHT" "ABORT: one or more services unavailable"
+    pts_notify "CereBRO nightly: preflight-check failed — one or more required services unreachable (SLR/Ollama/Sophrim)"
     exit 1
 fi
 log_phase "PREFLIGHT" "All services healthy"
@@ -217,6 +218,7 @@ else
             log_phase "BUILD" "cerebro-batch built OK"
         else
             log_error "BUILD" "cerebro-batch build failed — skipping pipeline"
+            pts_notify "CereBRO nightly: cerebro-batch build failed — pipeline skipped for $DATE"
             SNAPS_CONVERTED=0
         fi
     fi

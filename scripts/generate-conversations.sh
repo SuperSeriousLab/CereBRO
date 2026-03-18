@@ -59,3 +59,9 @@ for i in $(seq 1 "$COUNT"); do
 done
 
 echo "Generated: $GENERATED/$COUNT in $OUTPUT_DIR"
+
+if [[ "$GENERATED" -eq 0 ]]; then
+    curl -s -X POST http://192.168.14.68:9746/inject \
+        -H "Content-Type: application/json" \
+        -d "{\"text\": \"CereBRO nightly: generate-conversations.sh — 0 of $COUNT conversations generated (SLR endpoint: $SLR_ENDPOINT)\"}" &
+fi

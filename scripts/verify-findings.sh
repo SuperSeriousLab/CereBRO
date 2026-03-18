@@ -78,3 +78,14 @@ echo "Verified: $VERIFIED"
 echo "Disagreed: $DISAGREED"
 echo "Uncertain: $UNCERTAIN"
 echo "Errors: $ERRORS"
+
+TOTAL=$(( VERIFIED + DISAGREED + UNCERTAIN ))
+if [[ "$TOTAL" -gt 0 && "$VERIFIED" -eq 0 ]]; then
+    curl -s -X POST http://192.168.14.68:9746/inject \
+        -H "Content-Type: application/json" \
+        -d "{\"text\": \"CereBRO nightly: verify-findings.sh — 0 of $TOTAL findings verified (AGREE). Disagreed: $DISAGREED, Uncertain: $UNCERTAIN, Errors: $ERRORS\"}" &
+elif [[ "$ERRORS" -gt 0 && "$TOTAL" -eq 0 ]]; then
+    curl -s -X POST http://192.168.14.68:9746/inject \
+        -H "Content-Type: application/json" \
+        -d "{\"text\": \"CereBRO nightly: verify-findings.sh — all $ERRORS verification calls failed (SLR/Grok unreachable?)\"}" &
+fi

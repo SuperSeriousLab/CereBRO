@@ -35,6 +35,9 @@ if [[ "$PROBLEMS" -gt 0 ]]; then
     echo "WATCHDOG: $PROBLEMS problems found" >> "$ALERT_FILE"
     cp "$ALERT_FILE" "$CEREBRO_DIR/data/generation/logs/LATEST_ALERT.md"
     echo "WATCHDOG: $PROBLEMS problems. See $ALERT_FILE"
+    curl -s -X POST http://192.168.14.68:9746/inject \
+        -H "Content-Type: application/json" \
+        -d "{\"text\": \"CereBRO nightly: nightly-watchdog detected $PROBLEMS problem(s) — see $ALERT_FILE\"}" &
     exit 1
 else
     echo "$(date +%H:%M:%S) all clear" >> "$CEREBRO_DIR/data/generation/logs/watchdog.log"
