@@ -44,6 +44,7 @@ type PipelineConfig struct {
 	SophrimEndpoint     string                   // if non-empty, fetch DomainContext before pipeline run (advisory, 200ms timeout)
 	ConceptualAnchoring ConceptualAnchoringConfig // Tier 2: conceptual anchoring detector
 	InheritedPosition   InheritedPositionConfig   // Tier 2: inherited-position detector
+	DetectorFuzzy       *DetectorFuzzy            // L2 fuzzy severity (nil = crisp fallback)
 
 	// Sophrim feedback (Connection A of the Lamarckian Loop).
 	// Set by the caller with metadata from SLR / Sophrim grounding.
@@ -438,27 +439,37 @@ type DetectorFunc func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.Cogn
 // buildDetectorMap creates a uniform map of detector names to functions.
 // Config is captured by closure so all detectors share the same signature.
 // When cfg.MLEnrichment is non-nil, ML-enhanced variants are used.
+// When cfg.DetectorFuzzy is non-nil, fuzzy severity replaces crisp confidence
+// on findings; findings with fuzzy severity < 0.1 are suppressed.
 func buildDetectorMap(cfg PipelineConfig) map[Detector]DetectorFunc {
-	ml := cfg.MLEnrichment // captured by closures; nil when ML disabled
+	ml := cfg.MLEnrichment  // captured by closures; nil when ML disabled
+	df := cfg.DetectorFuzzy // captured by closures; nil when fuzzy disabled
 
 	m := map[Detector]DetectorFunc{
 		DetectorSunkCost: func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
+			var finding *reasoningv1.CognitiveAssessment
 			if ml != nil {
-				return DetectSunkCostML(snap, cfg.SunkCost, ml)
+				finding = DetectSunkCostML(snap, cfg.SunkCost, ml)
+			} else {
+				finding = DetectSunkCost(snap, cfg.SunkCost)
 			}
-			return DetectSunkCost(snap, cfg.SunkCost)
+			return applySunkCostFuzzy(finding, df)
 		},
 		DetectorContradiction: func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
-			return DetectContradiction(snap, cfg.Contradiction)
+			finding := DetectContradiction(snap, cfg.Contradiction)
+			return applyContradictionFuzzy(finding, snap, cfg.Contradiction, df)
 		},
 		DetectorScopeGuard: func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
 			return DetectScopeDrift(snap, cfg.ScopeGuard)
 		},
 		DetectorCalibrator: func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
+			var finding *reasoningv1.CognitiveAssessment
 			if ml != nil {
-				return DetectConfidenceMiscalibrationML(snap, cfg.Calibrator, ml)
+				finding = DetectConfidenceMiscalibrationML(snap, cfg.Calibrator, ml)
+			} else {
+				finding = DetectConfidenceMiscalibration(snap, cfg.Calibrator)
 			}
-			return DetectConfidenceMiscalibration(snap, cfg.Calibrator)
+			return applyCalibratorFuzzy(finding, df)
 		},
 		DetectorLedger: func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
 			return DetectSilentRevision(snap, cfg.Ledger)
@@ -468,14 +479,18 @@ func buildDetectorMap(cfg PipelineConfig) map[Detector]DetectorFunc {
 	if !cfg.SkipAnchoring {
 		if cfg.UseContextAnchoring {
 			m[DetectorAnchoring] = func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
+				var finding *reasoningv1.CognitiveAssessment
 				if ml != nil {
-					return DetectAnchoringContextML(snap, cfg.AnchoringContext, ml)
+					finding = DetectAnchoringContextML(snap, cfg.AnchoringContext, ml)
+				} else {
+					finding = DetectAnchoringContext(snap, cfg.AnchoringContext)
 				}
-				return DetectAnchoringContext(snap, cfg.AnchoringContext)
+				return applyAnchoringFuzzy(finding, df)
 			}
 		} else {
 			m[DetectorAnchoring] = func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
-				return DetectAnchoring(snap, cfg.Anchoring)
+				finding := DetectAnchoring(snap, cfg.Anchoring)
+				return applyAnchoringFuzzy(finding, df)
 			}
 		}
 	}

@@ -1,0 +1,52 @@
+{
+  "name": "l2_contradiction_detector",
+  "defuzz_method": "centroid",
+  "centroid_resolution": 200,
+  "input_variables": [
+    {
+      "name": "word_overlap",
+      "min": 0.0,
+      "max": 1.0,
+      "terms": [
+        { "name": "low", "Trapezoidal": { "a": 0.0, "b": 0.0, "c": 0.2, "d": 0.4 } },
+        { "name": "moderate", "Triangular": { "a": 0.25, "b": 0.5, "c": 0.75 } },
+        { "name": "high", "Trapezoidal": { "a": 0.6, "b": 0.8, "c": 1.0, "d": 1.0 } }
+      ]
+    },
+    {
+      "name": "kind_strength",
+      "min": 0.0,
+      "max": 1.0,
+      "terms": [
+        { "name": "weak", "Trapezoidal": { "a": 0.0, "b": 0.0, "c": 0.2, "d": 0.4 } },
+        { "name": "moderate", "Triangular": { "a": 0.25, "b": 0.5, "c": 0.75 } },
+        { "name": "strong", "Trapezoidal": { "a": 0.6, "b": 0.8, "c": 1.0, "d": 1.0 } }
+      ]
+    }
+  ],
+  "output_variables": [
+    {
+      "name": "severity",
+      "min": 0.0,
+      "max": 1.0,
+      "terms": [
+        { "name": "none", "Trapezoidal": { "a": 0.0, "b": 0.0, "c": 0.02, "d": 0.08 } },
+        { "name": "low", "Triangular": { "a": 0.05, "b": 0.2, "c": 0.4 } },
+        { "name": "medium", "Triangular": { "a": 0.3, "b": 0.5, "c": 0.7 } },
+        { "name": "high", "Triangular": { "a": 0.6, "b": 0.8, "c": 0.95 } },
+        { "name": "critical", "Trapezoidal": { "a": 0.85, "b": 0.95, "c": 1.0, "d": 1.0 } }
+      ]
+    }
+  ],
+  "rules": [
+    { "conditions": [{ "variable": "word_overlap", "term": "high" }, { "variable": "kind_strength", "term": "strong" }], "connector": "and", "consequent": { "variable": "severity", "term": "critical" } },
+    { "conditions": [{ "variable": "word_overlap", "term": "high" }, { "variable": "kind_strength", "term": "moderate" }], "connector": "and", "consequent": { "variable": "severity", "term": "high" } },
+    { "conditions": [{ "variable": "word_overlap", "term": "high" }, { "variable": "kind_strength", "term": "weak" }], "connector": "and", "consequent": { "variable": "severity", "term": "medium" } },
+    { "conditions": [{ "variable": "word_overlap", "term": "moderate" }, { "variable": "kind_strength", "term": "strong" }], "connector": "and", "consequent": { "variable": "severity", "term": "high" } },
+    { "conditions": [{ "variable": "word_overlap", "term": "moderate" }, { "variable": "kind_strength", "term": "moderate" }], "connector": "and", "consequent": { "variable": "severity", "term": "medium" } },
+    { "conditions": [{ "variable": "word_overlap", "term": "moderate" }, { "variable": "kind_strength", "term": "weak" }], "connector": "and", "consequent": { "variable": "severity", "term": "low" } },
+    { "conditions": [{ "variable": "word_overlap", "term": "low" }, { "variable": "kind_strength", "term": "strong" }], "connector": "and", "consequent": { "variable": "severity", "term": "medium" } },
+    { "conditions": [{ "variable": "word_overlap", "term": "low" }, { "variable": "kind_strength", "term": "moderate" }], "connector": "and", "consequent": { "variable": "severity", "term": "low" } },
+    { "conditions": [{ "variable": "word_overlap", "term": "low" }, { "variable": "kind_strength", "term": "weak" }], "connector": "and", "consequent": { "variable": "severity", "term": "none" } }
+  ]
+}

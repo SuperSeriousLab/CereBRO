@@ -1,0 +1,38 @@
+{
+  "name": "l2_anchoring_detector",
+  "defuzz_method": "centroid",
+  "centroid_resolution": 200,
+  "input_variables": [
+    {
+      "name": "relative_shift",
+      "min": 0.0,
+      "max": 1.0,
+      "terms": [
+        { "name": "very_close", "Trapezoidal": { "a": 0.0, "b": 0.0, "c": 0.03, "d": 0.08 } },
+        { "name": "close", "Triangular": { "a": 0.03, "b": 0.07, "c": 0.12 } },
+        { "name": "moderate", "Triangular": { "a": 0.08, "b": 0.12, "c": 0.18 } },
+        { "name": "far", "Trapezoidal": { "a": 0.14, "b": 0.2, "c": 1.0, "d": 1.0 } }
+      ]
+    }
+  ],
+  "output_variables": [
+    {
+      "name": "severity",
+      "min": 0.0,
+      "max": 1.0,
+      "terms": [
+        { "name": "none", "Trapezoidal": { "a": 0.0, "b": 0.0, "c": 0.02, "d": 0.08 } },
+        { "name": "low", "Triangular": { "a": 0.05, "b": 0.2, "c": 0.4 } },
+        { "name": "medium", "Triangular": { "a": 0.3, "b": 0.5, "c": 0.7 } },
+        { "name": "high", "Triangular": { "a": 0.6, "b": 0.8, "c": 0.95 } },
+        { "name": "critical", "Trapezoidal": { "a": 0.85, "b": 0.95, "c": 1.0, "d": 1.0 } }
+      ]
+    }
+  ],
+  "rules": [
+    { "conditions": [{ "variable": "relative_shift", "term": "very_close" }], "consequent": { "variable": "severity", "term": "critical" } },
+    { "conditions": [{ "variable": "relative_shift", "term": "close" }], "consequent": { "variable": "severity", "term": "high" } },
+    { "conditions": [{ "variable": "relative_shift", "term": "moderate" }], "consequent": { "variable": "severity", "term": "medium" } },
+    { "conditions": [{ "variable": "relative_shift", "term": "far" }], "consequent": { "variable": "severity", "term": "none" } }
+  ]
+}

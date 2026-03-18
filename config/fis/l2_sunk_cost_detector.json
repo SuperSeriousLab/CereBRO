@@ -1,0 +1,52 @@
+{
+  "name": "l2_sunk_cost_detector",
+  "defuzz_method": "centroid",
+  "centroid_resolution": 200,
+  "input_variables": [
+    {
+      "name": "confidence",
+      "min": 0.0,
+      "max": 1.0,
+      "terms": [
+        { "name": "low", "Trapezoidal": { "a": 0.0, "b": 0.0, "c": 0.3, "d": 0.5 } },
+        { "name": "moderate", "Triangular": { "a": 0.35, "b": 0.55, "c": 0.75 } },
+        { "name": "high", "Trapezoidal": { "a": 0.6, "b": 0.8, "c": 1.0, "d": 1.0 } }
+      ]
+    },
+    {
+      "name": "turn_gap",
+      "min": 0.0,
+      "max": 20.0,
+      "terms": [
+        { "name": "adjacent", "Trapezoidal": { "a": 0.0, "b": 0.0, "c": 1.0, "d": 3.0 } },
+        { "name": "nearby", "Triangular": { "a": 2.0, "b": 5.0, "c": 10.0 } },
+        { "name": "distant", "Trapezoidal": { "a": 7.0, "b": 12.0, "c": 20.0, "d": 20.0 } }
+      ]
+    }
+  ],
+  "output_variables": [
+    {
+      "name": "severity",
+      "min": 0.0,
+      "max": 1.0,
+      "terms": [
+        { "name": "none", "Trapezoidal": { "a": 0.0, "b": 0.0, "c": 0.02, "d": 0.08 } },
+        { "name": "low", "Triangular": { "a": 0.05, "b": 0.2, "c": 0.4 } },
+        { "name": "medium", "Triangular": { "a": 0.3, "b": 0.5, "c": 0.7 } },
+        { "name": "high", "Triangular": { "a": 0.6, "b": 0.8, "c": 0.95 } },
+        { "name": "critical", "Trapezoidal": { "a": 0.85, "b": 0.95, "c": 1.0, "d": 1.0 } }
+      ]
+    }
+  ],
+  "rules": [
+    { "conditions": [{ "variable": "confidence", "term": "high" }, { "variable": "turn_gap", "term": "adjacent" }], "connector": "and", "consequent": { "variable": "severity", "term": "critical" } },
+    { "conditions": [{ "variable": "confidence", "term": "high" }, { "variable": "turn_gap", "term": "nearby" }], "connector": "and", "consequent": { "variable": "severity", "term": "high" } },
+    { "conditions": [{ "variable": "confidence", "term": "high" }, { "variable": "turn_gap", "term": "distant" }], "connector": "and", "consequent": { "variable": "severity", "term": "medium" } },
+    { "conditions": [{ "variable": "confidence", "term": "moderate" }, { "variable": "turn_gap", "term": "adjacent" }], "connector": "and", "consequent": { "variable": "severity", "term": "high" } },
+    { "conditions": [{ "variable": "confidence", "term": "moderate" }, { "variable": "turn_gap", "term": "nearby" }], "connector": "and", "consequent": { "variable": "severity", "term": "medium" } },
+    { "conditions": [{ "variable": "confidence", "term": "moderate" }, { "variable": "turn_gap", "term": "distant" }], "connector": "and", "consequent": { "variable": "severity", "term": "low" } },
+    { "conditions": [{ "variable": "confidence", "term": "low" }, { "variable": "turn_gap", "term": "adjacent" }], "connector": "and", "consequent": { "variable": "severity", "term": "medium" } },
+    { "conditions": [{ "variable": "confidence", "term": "low" }, { "variable": "turn_gap", "term": "nearby" }], "connector": "and", "consequent": { "variable": "severity", "term": "low" } },
+    { "conditions": [{ "variable": "confidence", "term": "low" }, { "variable": "turn_gap", "term": "distant" }], "connector": "and", "consequent": { "variable": "severity", "term": "none" } }
+  ]
+}

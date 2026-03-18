@@ -1,0 +1,36 @@
+{
+  "name": "l2_calibrator_detector",
+  "defuzz_method": "centroid",
+  "centroid_resolution": 200,
+  "input_variables": [
+    {
+      "name": "ece",
+      "min": 0.0,
+      "max": 1.0,
+      "terms": [
+        { "name": "low", "Trapezoidal": { "a": 0.0, "b": 0.0, "c": 0.25, "d": 0.45 } },
+        { "name": "moderate", "Triangular": { "a": 0.3, "b": 0.5, "c": 0.7 } },
+        { "name": "high", "Trapezoidal": { "a": 0.55, "b": 0.75, "c": 1.0, "d": 1.0 } }
+      ]
+    }
+  ],
+  "output_variables": [
+    {
+      "name": "severity",
+      "min": 0.0,
+      "max": 1.0,
+      "terms": [
+        { "name": "none", "Trapezoidal": { "a": 0.0, "b": 0.0, "c": 0.02, "d": 0.08 } },
+        { "name": "low", "Triangular": { "a": 0.05, "b": 0.2, "c": 0.4 } },
+        { "name": "medium", "Triangular": { "a": 0.3, "b": 0.5, "c": 0.7 } },
+        { "name": "high", "Triangular": { "a": 0.6, "b": 0.8, "c": 0.95 } },
+        { "name": "critical", "Trapezoidal": { "a": 0.85, "b": 0.95, "c": 1.0, "d": 1.0 } }
+      ]
+    }
+  ],
+  "rules": [
+    { "conditions": [{ "variable": "ece", "term": "high" }], "consequent": { "variable": "severity", "term": "critical" } },
+    { "conditions": [{ "variable": "ece", "term": "moderate" }], "consequent": { "variable": "severity", "term": "medium" } },
+    { "conditions": [{ "variable": "ece", "term": "low" }], "consequent": { "variable": "severity", "term": "none" } }
+  ]
+}
