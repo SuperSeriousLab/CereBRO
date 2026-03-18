@@ -105,6 +105,53 @@ func TestGate1_AbsolutelyInFormalContextNotInhibited(t *testing.T) {
 	}
 }
 
+func TestGate1_ClassicalPhilosophyNotSuppressed(t *testing.T) {
+	// Classical philosophy conversations use archaic English vocabulary that
+	// scores below the 0.85 formality threshold despite being genuinely formal.
+	// The conversation contains multiple classicalFormalMarkers ("is it not",
+	// "let us suppose") which trigger the isClassicalText bypass in Gate 1,
+	// preventing suppression even when a casual hedge word ("certainly") appears.
+	assessment := makeAssessment("confidence-calibrator",
+		reasoningv1.FindingType_CONFIDENCE_MISCALIBRATION,
+		reasoningv1.FindingSeverity_WARNING,
+		0.72, []uint32{3})
+
+	snap := makeSnap([]struct{ num uint32; speaker, text string }{
+		{1, "socrates", "I went down yesterday to the Piraeus with Glaucon the son of Ariston, that I might offer up my prayers to the goddess; and also because I wanted to see in what manner they would celebrate the festival, which was a new thing."},
+		{2, "cephalus", "Well, Socrates, I will tell you my own feeling. Men of my age flock together; we are birds of a feather, as the old proverb says; and at our meetings the tale of my acquaintance commonly is — is it not so? — that life is no longer worth living."},
+		{3, "socrates", "I am certainly persuaded that the gods send misfortunes to men. Let us suppose, for the sake of argument, that he who is of a calm nature will hardly feel the pressure of age. Do you not think that such a man need fear no punishment hereafter?"},
+		{4, "cephalus", "One of which I could not easily convince others. For let me tell you, Socrates, that when a man thinks himself to be near death, fears and cares enter into his mind which he never had before; the tales of a world below and the punishment which is exacted there of deeds done here were once a laughing matter to him."},
+	}, "What is the nature of justice?")
+
+	// Provide corroboration so Gate 5 passes.
+	corr := makeAssessment("contradiction-tracker",
+		reasoningv1.FindingType_CONTRADICTION,
+		reasoningv1.FindingSeverity_WARNING,
+		0.8, []uint32{3})
+
+	cfg := DefaultInhibitorConfig()
+	cfg.StakesThreshold = 0.0 // Disable gate 3
+
+	result := Inhibit([]*reasoningv1.CognitiveAssessment{assessment, corr}, snap, cfg)
+
+	var cmDecision *cerebrov1.InhibitionDecision
+	for _, d := range result.Decisions {
+		if d.GetDetectorName() == "confidence-calibrator" {
+			cmDecision = d
+			break
+		}
+	}
+	if cmDecision == nil {
+		t.Fatal("no decision for confidence-calibrator")
+	}
+
+	if cmDecision.GetAction() == cerebrov1.InhibitionAction_INHIBITED &&
+		cmDecision.GetReason() == "casual_hedge_in_informal_context" {
+		t.Errorf("classical philosophy with hedge word should NOT be suppressed by Gate 1 (formality threshold 0.70); formality=%.2f reason=%s",
+			result.Formality, cmDecision.GetReason())
+	}
+}
+
 func TestGate1_NonConfidenceFindingWithAbsolutelyNotAffected(t *testing.T) {
 	assessment := makeAssessment("contradiction-tracker",
 		reasoningv1.FindingType_CONTRADICTION,

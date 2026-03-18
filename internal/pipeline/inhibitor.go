@@ -194,8 +194,11 @@ func evaluateDisinhibition(
 	// severity auto-pass for CONFIDENCE_MISCALIBRATION in informal contexts.
 	// Without this ordering, CRITICAL-severity miscalibration findings on
 	// casual "absolutely"/"definitely" would auto-pass Gate 2.
+	// Exception: classical/philosophical text (archaic vocabulary) scores
+	// below 0.85 formality despite being genuinely formal — bypass Gate 1
+	// for such texts so that real miscalibration findings are not suppressed.
 	if finding.GetFindingType() == reasoningv1.FindingType_CONFIDENCE_MISCALIBRATION {
-		if formality < cfg.FormalityThreshold {
+		if formality < cfg.FormalityThreshold && !isClassicalText(snap) {
 			triggerText := extractTriggerText(finding, snap)
 			if containsCasualHedge(triggerText, cfg.CasualHedgeWords) {
 				return makeDecision(fid, cerebrov1.InhibitionAction_INHIBITED,
@@ -259,8 +262,9 @@ func evaluateFuzzyInhibition(
 	fz := cfg.Fuzzy
 
 	// Gate 1 (crisp): Casual hedging suppression — still binary override.
+	// Exception: classical/philosophical text bypasses this gate (see evaluateDisinhibition).
 	if finding.GetFindingType() == reasoningv1.FindingType_CONFIDENCE_MISCALIBRATION {
-		if formality < cfg.FormalityThreshold {
+		if formality < cfg.FormalityThreshold && !isClassicalText(snap) {
 			triggerText := extractTriggerText(finding, snap)
 			if containsCasualHedge(triggerText, cfg.CasualHedgeWords) {
 				return makeDecision(fid, cerebrov1.InhibitionAction_INHIBITED,
@@ -419,6 +423,35 @@ func containsCasualHedge(text string, hedgeWords []string) bool {
 	for _, w := range words {
 		if hedgeSet[w] {
 			return true
+		}
+	}
+	return false
+}
+
+// isClassicalText returns true when the conversation contains enough archaic /
+// classical-philosophy vocabulary to be treated as formal regardless of its
+// raw formality score.  Classical texts (Plato, Aristotle, KJV-style prose)
+// use archaic constructions that the formality scorer underweights, so they
+// can score below the 0.85 FormalityThreshold while being genuinely formal.
+// Gate 1 should not suppress CONFIDENCE_MISCALIBRATION findings in such texts.
+//
+// The heuristic: at least 2 distinct classicalFormalMarkers must appear across
+// the conversation.  A single archaic word could be coincidental; two or more
+// strongly indicates classical register.
+func isClassicalText(snap *reasoningv1.ConversationSnapshot) bool {
+	if snap == nil {
+		return false
+	}
+	seen := make(map[string]bool)
+	for _, turn := range snap.GetTurns() {
+		text := strings.ToLower(turn.GetRawText())
+		for _, marker := range classicalFormalMarkers {
+			if !seen[marker] && strings.Contains(text, marker) {
+				seen[marker] = true
+				if len(seen) >= 2 {
+					return true
+				}
+			}
 		}
 	}
 	return false
