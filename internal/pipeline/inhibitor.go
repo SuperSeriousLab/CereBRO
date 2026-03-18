@@ -197,8 +197,11 @@ func evaluateDisinhibition(
 	// Exception: classical/philosophical text (archaic vocabulary) scores
 	// below 0.85 formality despite being genuinely formal — bypass Gate 1
 	// for such texts so that real miscalibration findings are not suppressed.
+	// isClassicalTextFor uses both generic and pathology-specific marker
+	// dictionaries so that domain vocabulary in classical economic or
+	// epistemic texts is also recognised.
 	if finding.GetFindingType() == reasoningv1.FindingType_CONFIDENCE_MISCALIBRATION {
-		if formality < cfg.FormalityThreshold && !isClassicalText(snap) {
+		if formality < cfg.FormalityThreshold && !isClassicalTextFor(snap, finding.GetFindingType()) {
 			triggerText := extractTriggerText(finding, snap)
 			if containsCasualHedge(triggerText, cfg.CasualHedgeWords) {
 				return makeDecision(fid, cerebrov1.InhibitionAction_INHIBITED,
@@ -263,8 +266,10 @@ func evaluateFuzzyInhibition(
 
 	// Gate 1 (crisp): Casual hedging suppression — still binary override.
 	// Exception: classical/philosophical text bypasses this gate (see evaluateDisinhibition).
+	// isClassicalTextFor uses pathology-specific marker dictionaries so that
+	// domain vocabulary in classical epistemic or economic texts is recognised.
 	if finding.GetFindingType() == reasoningv1.FindingType_CONFIDENCE_MISCALIBRATION {
-		if formality < cfg.FormalityThreshold && !isClassicalText(snap) {
+		if formality < cfg.FormalityThreshold && !isClassicalTextFor(snap, finding.GetFindingType()) {
 			triggerText := extractTriggerText(finding, snap)
 			if containsCasualHedge(triggerText, cfg.CasualHedgeWords) {
 				return makeDecision(fid, cerebrov1.InhibitionAction_INHIBITED,
@@ -438,14 +443,45 @@ func containsCasualHedge(text string, hedgeWords []string) bool {
 // The heuristic: at least 2 distinct classicalFormalMarkers must appear across
 // the conversation.  A single archaic word could be coincidental; two or more
 // strongly indicates classical register.
+//
+// Deprecated: prefer isClassicalTextFor which accepts a pathology type and
+// also checks domain-specific classical marker dictionaries.
 func isClassicalText(snap *reasoningv1.ConversationSnapshot) bool {
+	return isClassicalTextFor(snap, reasoningv1.FindingType_CONFIDENCE_MISCALIBRATION)
+}
+
+// isClassicalTextFor returns true when the conversation reads as classical /
+// formal philosophical or academic discourse when evaluated in the context of
+// a specific pathology type.
+//
+// In addition to the generic classicalFormalMarkers it consults a
+// pathology-specific dictionary so that domain vocabulary from classical
+// economic, epistemic, or commitment-theory texts is also recognised:
+//
+//   - SUNK_COST_FALLACY    → classicalSunkCostMarkers
+//   - CONFIDENCE_MISCALIBRATION → classicalConfidenceMarkers
+//   - all others           → generic classicalFormalMarkers only
+//
+// The heuristic requires at least 2 distinct marker hits across all applicable
+// dictionaries.  Matching two markers from different dictionaries counts.
+func isClassicalTextFor(snap *reasoningv1.ConversationSnapshot, pathology reasoningv1.FindingType) bool {
 	if snap == nil {
 		return false
 	}
+
+	// Build the combined marker set for this pathology.
+	markers := classicalFormalMarkers
+	switch pathology {
+	case reasoningv1.FindingType_SUNK_COST_FALLACY:
+		markers = append(markers, classicalSunkCostMarkers...)
+	case reasoningv1.FindingType_CONFIDENCE_MISCALIBRATION:
+		markers = append(markers, classicalConfidenceMarkers...)
+	}
+
 	seen := make(map[string]bool)
 	for _, turn := range snap.GetTurns() {
 		text := strings.ToLower(turn.GetRawText())
-		for _, marker := range classicalFormalMarkers {
+		for _, marker := range markers {
 			if !seen[marker] && strings.Contains(text, marker) {
 				seen[marker] = true
 				if len(seen) >= 2 {
@@ -600,6 +636,76 @@ var classicalFormalMarkers = []string{
 	"as i have argued", "as we have seen", "as has been shown",
 	"let us suppose", "let us assume", "let us grant",
 	"one who is", "he who is", "she who is",
+}
+
+// classicalSunkCostMarkers covers vocabulary that appears in classical
+// philosophical, economic, and academic texts when discussing prior commitment,
+// resource allocation, irrecoverable costs, and loss aversion.  These phrases
+// signal that sunk-cost reasoning is being analyzed in a formal register so
+// that the inhibitor does not gate genuine SUNK_COST_FALLACY findings on the
+// grounds of apparent informality.
+//
+// Examples drawn from Aristotle's Nicomachean Ethics, Adam Smith's Wealth of
+// Nations, 19th-century utilitarian literature, and academic decision theory.
+var classicalSunkCostMarkers = []string{
+	// Resource commitment language
+	"committed resources", "prior investment", "having already expended",
+	"irrecoverable costs", "past expenditure", "resources already allocated",
+	"previous commitment", "having invested", "resources already committed",
+	"expenditure already incurred", "costs already borne", "already laid out",
+	"previously expended", "having already laid out", "having already committed",
+	// Loss / irreversibility framing
+	"cannot now be recovered", "now past recovery", "beyond recovery",
+	"what has been spent cannot", "the loss already sustained",
+	"irrecoverable expenditure", "irreversible commitment",
+	"already foregone", "having foregone", "the sacrifice already made",
+	"what is already lost", "the investment already made",
+	// Classical economic register
+	"sunk capital", "the capital already sunk", "capital already expended",
+	"the outlay already made", "money already expended", "already laid the foundation",
+	"having laid the foundation", "the cost already incurred",
+	// Philosophical commitment-persistence framing
+	"bound by prior agreement", "obligated by prior commitment",
+	"honour our prior commitment", "honour our earlier commitment",
+	"fidelity to the original", "adherence to the original plan",
+	"having pledged ourselves", "having given our word",
+	"the promise already given", "the vow already taken",
+}
+
+// classicalConfidenceMarkers covers vocabulary that appears in classical
+// philosophical, theological, and academic texts when making assertions of
+// absolute certainty, epistemic dogmatism, or self-evident truth.  These
+// phrases signal that confidence-miscalibration patterns are being analyzed
+// in a formal register so that genuine CONFIDENCE_MISCALIBRATION findings are
+// not suppressed by the formality gate.
+//
+// Examples drawn from Plato, Descartes, Kant, Leibniz, scholastic theology,
+// and 18th–19th century rationalist prose.
+var classicalConfidenceMarkers = []string{
+	// Absolute certainty claims
+	"without question", "it is self-evident", "cannot be doubted",
+	"absolute certainty", "indubitable", "beyond all reasonable doubt",
+	"it is certain that", "necessarily follows", "must be the case",
+	"it is axiomatic", "admits of no doubt", "admits no doubt",
+	"cannot possibly be doubted", "no reasonable doubt", "beyond doubt",
+	"it is evident to all", "manifest to all", "plain to all",
+	// Rationalist / scholastic register
+	"it is demonstrable", "demonstrably true", "demonstrable by reason",
+	"can be demonstrated", "admits of demonstration", "follows necessarily",
+	"it follows necessarily", "reason compels us", "reason dictates",
+	"it is self-contradictory to deny", "the contrary is inconceivable",
+	"reason alone suffices", "pure reason establishes",
+	"by the light of reason", "the light of natural reason",
+	// Dogmatic assertion markers
+	"there can be no question", "it is unquestionable", "unquestionably true",
+	"it is unquestionably", "unquestionably the case", "no room for doubt",
+	"leaves no room for doubt", "no question can arise",
+	"it is incontrovertible", "incontrovertibly established",
+	"incontestably true", "incontestably the case",
+	// Classical epistemic certainty phrases
+	"i know with certainty", "i am certain beyond", "i know for certain",
+	"i am entirely certain", "wholly certain", "perfectly certain",
+	"absolutely certain", "certain beyond question",
 }
 
 var informalMarkers = []string{
