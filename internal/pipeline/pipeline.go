@@ -51,6 +51,7 @@ type PipelineConfig struct {
 	NegativeClaim            NegativeClaimConfig            // Tier 2: MaxMV(negative-direction claims) > 0.45 (gen0_93)
 	AssumptionSurfacer       AssumptionSurfacerConfig       // Phase 9, Tier2_Structural: unstated assumption chain detector
 	CircularReasoning        CircularReasoningConfig        // Phase 9, Tier2_Structural: self-referential justification detector
+	EvidenceQuality          EvidenceQualityConfig          // Phase 9, Tier2_Structural: anecdotal vs empirical evidence detector
 	DetectorFuzzy       *DetectorFuzzy            // L2 fuzzy severity (nil = crisp fallback)
 	FuzzyUrgency        *FuzzyUrgency             // L1 fuzzy urgency (nil = crisp fallback)
 	Arbitrator          *CrossLayerArbitrator     // Cross-layer arbitration (nil = passthrough)
@@ -124,6 +125,7 @@ func DefaultPipelineConfig() PipelineConfig {
 		NegativeClaim:        DefaultNegativeClaimConfig(),
 		AssumptionSurfacer:   DefaultAssumptionSurfacerConfig(),
 		CircularReasoning:    DefaultCircularReasoningConfig(),
+		EvidenceQuality:      DefaultEvidenceQualityConfig(),
 	}
 }
 
@@ -643,6 +645,12 @@ func buildDetectorMap(cfg PipelineConfig) map[Detector]DetectorFunc {
 	// and circular_ratio > 0.35. Phase 9, Tier2_Structural.
 	m[DetectorCircularReasoning] = func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
 		return DetectCircularReasoning(snap, cfg.CircularReasoning)
+	}
+
+	// EvidenceQuality: fires UNSUPPORTED_CONCLUSION when avg_anecdotal_ratio > 0.70
+	// and anecdotal >= 2, or high_conf_anecdote_turns >= 2. Phase 9, Tier2_Structural.
+	m[DetectorEvidenceQuality] = func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
+		return DetectEvidenceQuality(snap, cfg.EvidenceQuality)
 	}
 
 	return m

@@ -25,6 +25,7 @@ const (
 	DetectorNegativeClaim         Detector = "negative-claim-confidence"
 	DetectorAssumptionSurfacer    Detector = "assumption-surfacer-detector"
 	DetectorCircularReasoning     Detector = "circular-reasoning-detector"
+	DetectorEvidenceQuality       Detector = "evidence-quality-detector"
 )
 
 // RouterConfig holds activation thresholds.
@@ -291,6 +292,18 @@ func Route(snap *reasoningv1.ConversationSnapshot, cfg RouterConfig) RoutingDeci
 	if assistantTurnCount >= 2 {
 		activated = append(activated, DetectorCircularReasoning)
 		reasons = append(reasons, "multiple assistant turns present — checking for circular self-referential reasoning")
+	}
+
+	// EvidenceQuality: activate when conversation has ≥ 1 assistant turn.
+	// Phase 9, Tier2_Structural — detects anecdotal evidence in high-confidence claims.
+	// Fires UNSUPPORTED_CONCLUSION when avg_anecdotal_ratio > 0.70 and anecdotal >= 2,
+	// or high_conf_anecdote_turns >= 2.
+	for _, t := range turns {
+		if strings.ToLower(t.GetSpeaker()) == "assistant" {
+			activated = append(activated, DetectorEvidenceQuality)
+			reasons = append(reasons, "assistant turns present — checking for anecdotal evidence in high-confidence claims")
+			break
+		}
 	}
 
 	return RoutingDecision{Activated: activated, Reasons: reasons}

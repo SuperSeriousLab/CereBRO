@@ -1,0 +1,84 @@
+# Evidence Quality COG manifest.
+# PURE deterministic — detects anecdotal vs empirical evidence in assistant turns.
+# Fires UNSUPPORTED_CONCLUSION when avg_anecdotal_ratio > 0.70 and anecdotal >= 2,
+# or high_conf_anecdote_turns >= 2.
+# Phase 9, Tier2_Structural — Layer 2 (Cortical Specialists / Detectors).
+
+name: "evidence-quality-detector"
+version: "0.1.0"
+language: GO
+determinism: PURE
+
+ports {
+  name: "conversation_snapshot"
+  direction: IN
+  message_type: "cog.reasoning.v1.ConversationSnapshot"
+}
+
+ports {
+  name: "assessment"
+  direction: OUT
+  message_type: "cog.reasoning.v1.CognitiveAssessment"
+}
+
+ports {
+  name: "_error"
+  direction: OUT
+  message_type: "cog.core.v1.ErrorEvent"
+}
+
+contracts {
+  packages: "cog.reasoning.v1"
+  packages: "cog.core.v1"
+  proto_hash: "sha256:pending"
+}
+
+config {
+  fields {
+    name: "anecdotal_ratio_threshold"
+    type: DOUBLE
+    default_value: "0.70"
+    required: false
+    description: "Minimum average anecdotal ratio across assistant turns to fire on the ratio path"
+    min_value: "0.0"
+    max_value: "1.0"
+    evolvable: true
+  }
+  fields {
+    name: "min_anecdotal_count"
+    type: UINT32
+    default_value: "2"
+    required: false
+    description: "Minimum total anecdotal phrase count before firing on the ratio path"
+    min_value: "1"
+    max_value: "100"
+    evolvable: true
+  }
+  fields {
+    name: "min_high_confidence_anecdote_turns"
+    type: UINT32
+    default_value: "2"
+    required: false
+    description: "Minimum turns with both high-confidence markers and anecdotal phrases before firing"
+    min_value: "1"
+    max_value: "20"
+    evolvable: true
+  }
+}
+
+description: "Detects anecdotal evidence in high-confidence claims — fires UNSUPPORTED_CONCLUSION when the assistant predominantly uses anecdotal phrases ('I heard', 'supposedly', 'some say') over empirical grounding ('studies show', 'data suggests'). avg_anecdotal_ratio > 0.70 and anecdotal >= 2, or high_conf_anecdote_turns >= 2. Phase 9, Tier2_Structural."
+
+tags: "cognitive"
+tags: "cerebro"
+tags: "tier2-structural"
+tags: "pure"
+tags: "phase9"
+
+lineage {
+  level: HAND_CRAFTED
+  genesis_rule: "phase9-evidence-quality"
+  source_corpus: "full-v4.ndjson"
+  fitness: 0.0
+  precision: 0.0
+  recall: 0.0
+}

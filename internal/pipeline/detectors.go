@@ -3404,3 +3404,211 @@ func DetectCircularReasoning(snap *reasoningv1.ConversationSnapshot, cfg Circula
 		DetectorName:  "circular-reasoning-detector",
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Evidence Quality Detector
+// Phase 9, Tier2_Structural — evidence-quality-detector
+//
+// PURE deterministic — no LLM calls. Detects when the majority of evidence
+// cited is anecdotal rather than empirical. Fires UNSUPPORTED_CONCLUSION when
+// high-confidence claims are built on anecdotal foundations (e.g. "I heard",
+// "supposedly", "some say") rather than empirical sources ("studies show",
+// "data suggests", "peer-reviewed").
+//
+// Signal logic (per assistant turn):
+//   - Count anecdotal phrases (case-insensitive)
+//   - Count empirical phrases (case-insensitive)
+//   - Count high-confidence markers (case-insensitive)
+//   - anecdotal_ratio = anecdotal / (anecdotal + empirical + 1.0)
+//   - high_confidence_with_anecdote = high_conf_markers > 0 AND anecdotal > 0
+//
+// Aggregate across turns:
+//   - avg_anecdotal_ratio across assistant turns
+//   - high_conf_anecdote_turns = turns where both conditions hold
+//
+// Fire UNSUPPORTED_CONCLUSION when:
+//   - avg_anecdotal_ratio > 0.70 AND anecdotal total >= 2
+//   - OR high_conf_anecdote_turns >= 2
+//   - Confidence = 0.5 + 0.5 * avg_anecdotal_ratio
+//   - Severity: HIGH if avg_ratio > 0.85 or high_conf_anecdote_turns >= 3, MEDIUM otherwise
+//
+// Finding type: UNSUPPORTED_CONCLUSION
+// Tier: Tier2_Structural
+// Layer: 2 (Cortical Specialists / Detectors)
+// ---------------------------------------------------------------------------
+
+// EvidenceQualityConfig holds parameters for the EvidenceQuality detector.
+type EvidenceQualityConfig struct {
+	// AnecdotalRatioThreshold: minimum avg anecdotal ratio across turns to fire.
+	// Default: 0.70.
+	AnecdotalRatioThreshold float64
+	// MinAnecdotalCount: minimum total anecdotal phrase count before firing on ratio.
+	// Default: 2.
+	MinAnecdotalCount int
+	// MinHighConfidenceAnecdoteTurns: minimum turns with high-confidence+anecdotal
+	// combination to fire. Default: 2.
+	MinHighConfidenceAnecdoteTurns int
+}
+
+// DefaultEvidenceQualityConfig returns the default configuration.
+func DefaultEvidenceQualityConfig() EvidenceQualityConfig {
+	return EvidenceQualityConfig{
+		AnecdotalRatioThreshold:        0.70,
+		MinAnecdotalCount:              2,
+		MinHighConfidenceAnecdoteTurns: 2,
+	}
+}
+
+// evidenceQualityAnecdotalPhrases is the ordered list of anecdotal signal phrases.
+var evidenceQualityAnecdotalPhrases = []string{
+	"i heard",
+	"supposedly",
+	"some say",
+	"people say",
+	"people think",
+	"they say",
+	"word is",
+	"rumor",
+	"anecdotally",
+	"in my experience",
+	"i believe",
+	"i think",
+	"i feel like",
+	"seems like",
+	"appears to",
+	"probably",
+	"might be",
+	"could be",
+	"perhaps",
+}
+
+// evidenceQualityEmpiricalPhrases is the ordered list of empirical signal phrases.
+var evidenceQualityEmpiricalPhrases = []string{
+	"studies show",
+	"research shows",
+	"research indicates",
+	"data shows",
+	"data suggests",
+	"evidence shows",
+	"according to",
+	"study found",
+	"experiment",
+	"statistically",
+	"measured",
+	"peer-reviewed",
+	"published",
+	"journal",
+	"meta-analysis",
+}
+
+// evidenceQualityHighConfidenceMarkers is the ordered list of high-confidence markers.
+var evidenceQualityHighConfidenceMarkers = []string{
+	"definitely",
+	"certainly",
+	"clearly",
+	"obviously",
+	"undeniably",
+	"it is known",
+	"it is clear",
+	"proven",
+	"fact",
+	"without doubt",
+}
+
+// evidenceQualityCountPhrases counts how many phrases from the list appear
+// in the lower-cased text (each phrase counted once per occurrence).
+func evidenceQualityCountPhrases(lower string, phrases []string) int {
+	count := 0
+	for _, p := range phrases {
+		// Count overlapping occurrences by scanning forward.
+		start := 0
+		for {
+			idx := strings.Index(lower[start:], p)
+			if idx < 0 {
+				break
+			}
+			count++
+			start += idx + 1
+		}
+	}
+	return count
+}
+
+// DetectEvidenceQuality fires UNSUPPORTED_CONCLUSION when the assistant
+// predominantly uses anecdotal evidence in high-confidence claims.
+// Implements Phase 9 Tier2_Structural — evidence-quality-detector.
+func DetectEvidenceQuality(snap *reasoningv1.ConversationSnapshot, cfg EvidenceQualityConfig) *reasoningv1.CognitiveAssessment {
+	if snap == nil {
+		return nil
+	}
+
+	totalAnecdotal := 0
+	totalRatioSum := 0.0
+	highConfAnecdoteTurns := 0
+	contentTurns := 0
+	var relevantTurns []uint32
+
+	for _, turn := range snap.GetTurns() {
+		if turn.GetSpeaker() != "assistant" {
+			continue
+		}
+		text := strings.TrimSpace(turn.GetRawText())
+		if text == "" {
+			continue
+		}
+		lower := strings.ToLower(text)
+		contentTurns++
+
+		anecdotal := evidenceQualityCountPhrases(lower, evidenceQualityAnecdotalPhrases)
+		empirical := evidenceQualityCountPhrases(lower, evidenceQualityEmpiricalPhrases)
+		highConf := evidenceQualityCountPhrases(lower, evidenceQualityHighConfidenceMarkers)
+
+		ratio := float64(anecdotal) / (float64(anecdotal) + float64(empirical) + 1.0)
+		totalAnecdotal += anecdotal
+		totalRatioSum += ratio
+
+		if highConf > 0 && anecdotal > 0 {
+			highConfAnecdoteTurns++
+			relevantTurns = append(relevantTurns, turn.GetTurnNumber())
+		}
+	}
+
+	if contentTurns == 0 {
+		return nil
+	}
+
+	avgRatio := totalRatioSum / float64(contentTurns)
+
+	// Firing conditions.
+	ratioCond := avgRatio > cfg.AnecdotalRatioThreshold && totalAnecdotal >= cfg.MinAnecdotalCount
+	highConfCond := highConfAnecdoteTurns >= cfg.MinHighConfidenceAnecdoteTurns
+
+	if !ratioCond && !highConfCond {
+		return nil
+	}
+
+	// Confidence: 0.5 + 0.5 * avg_ratio (capped at 1.0).
+	confidence := 0.5 + 0.5*avgRatio
+	if confidence > 1.0 {
+		confidence = 1.0
+	}
+
+	severity := reasoningv1.FindingSeverity_WARNING
+	if avgRatio > 0.85 || highConfAnecdoteTurns >= 3 {
+		severity = reasoningv1.FindingSeverity_CRITICAL
+	}
+
+	explanation := "EvidenceQuality: avg_anecdotal_ratio=" + formatFloat(avgRatio) +
+		" total_anecdotal=" + uintToString(uint32(totalAnecdotal)) +
+		" high_conf_anecdote_turns=" + uintToString(uint32(highConfAnecdoteTurns)) +
+		". High-confidence claims built on predominantly anecdotal foundations."
+
+	return &reasoningv1.CognitiveAssessment{
+		FindingType:   reasoningv1.FindingType_UNSUPPORTED_CONCLUSION,
+		Severity:      severity,
+		Explanation:   explanation,
+		RelevantTurns: relevantTurns,
+		Confidence:    confidence,
+		DetectorName:  "evidence-quality-detector",
+	}
+}
