@@ -185,6 +185,11 @@ const (
 	FindingType_ENTITY_COHERENCE_BREAK FindingType = 40
 	FindingType_SYCOPHANCY             FindingType = 41
 	FindingType_FALSE_DICHOTOMY        FindingType = 42
+	// Structural complexity / evidence imbalance
+	FindingType_CATHEDRAL_COMPLEXITY       FindingType = 43 // over-engineering: solution complexity escalates beyond scope
+	FindingType_COUNTER_EVIDENCE_DEPLETION FindingType = 44 // counter-evidence dismissed or absent with high confidence
+	// Meta / compound findings (Tier 3 COGs)
+	FindingType_COMPOUND_PATHOLOGY FindingType = 50 // multiple detectors fired simultaneously; Mamdani FIS risk aggregation
 )
 
 // Enum value maps for FindingType.
@@ -211,6 +216,9 @@ var (
 		40: "ENTITY_COHERENCE_BREAK",
 		41: "SYCOPHANCY",
 		42: "FALSE_DICHOTOMY",
+		43: "CATHEDRAL_COMPLEXITY",
+		44: "COUNTER_EVIDENCE_DEPLETION",
+		50: "COMPOUND_PATHOLOGY",
 	}
 	FindingType_value = map[string]int32{
 		"FINDING_TYPE_UNSPECIFIED":   0,
@@ -234,6 +242,9 @@ var (
 		"ENTITY_COHERENCE_BREAK":     40,
 		"SYCOPHANCY":                 41,
 		"FALSE_DICHOTOMY":            42,
+		"CATHEDRAL_COMPLEXITY":       43,
+		"COUNTER_EVIDENCE_DEPLETION": 44,
+		"COMPOUND_PATHOLOGY":         50,
 	}
 )
 
@@ -1914,7 +1925,7 @@ const file_cog_reasoning_v1_reasoning_proto_rawDesc = "" +
 	"\x04INFO\x10\x01\x12\v\n" +
 	"\aCAUTION\x10\x02\x12\v\n" +
 	"\aWARNING\x10\x03\x12\f\n" +
-	"\bCRITICAL\x10\x04*\x82\x04\n" +
+	"\bCRITICAL\x10\x04*\xd4\x04\n" +
 	"\vFindingType\x12\x1c\n" +
 	"\x18FINDING_TYPE_UNSPECIFIED\x10\x00\x12\x11\n" +
 	"\rCONTRADICTION\x10\x01\x12\x16\n" +
@@ -1939,7 +1950,10 @@ const file_cog_reasoning_v1_reasoning_proto_rawDesc = "" +
 	"\x16ENTITY_COHERENCE_BREAK\x10(\x12\x0e\n" +
 	"\n" +
 	"SYCOPHANCY\x10)\x12\x13\n" +
-	"\x0fFALSE_DICHOTOMY\x10**x\n" +
+	"\x0fFALSE_DICHOTOMY\x10*\x12\x18\n" +
+	"\x14CATHEDRAL_COMPLEXITY\x10+\x12\x1e\n" +
+	"\x1aCOUNTER_EVIDENCE_DEPLETION\x10,\x12\x16\n" +
+	"\x12COMPOUND_PATHOLOGY\x102*x\n" +
 	"\x0fConfidenceLevel\x12 \n" +
 	"\x1cCONFIDENCE_LEVEL_UNSPECIFIED\x10\x00\x12\v\n" +
 	"\aCERTAIN\x10\x01\x12\n" +

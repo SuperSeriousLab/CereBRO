@@ -80,6 +80,13 @@ enum FindingType {
   SYCOPHANCY = 41;
   FALSE_DICHOTOMY = 42;
 
+  // Structural complexity / evidence imbalance
+  CATHEDRAL_COMPLEXITY      = 43;  // over-engineering: solution complexity escalates beyond scope
+  COUNTER_EVIDENCE_DEPLETION = 44; // counter-evidence dismissed or absent with high confidence
+
+  // Meta / compound findings (Tier 3 COGs)
+  COMPOUND_PATHOLOGY = 50; // multiple detectors fired simultaneously; Mamdani FIS risk aggregation
+
   // 100+ reserved for Forge-discovered finding types
 }
 

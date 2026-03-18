@@ -1,0 +1,70 @@
+# NegativeClaimHighConfidence COG manifest.
+# PURE deterministic — MaxMV on negative-direction claims.
+# Fires when max confidence among negative-direction sentences > 0.45.
+# Genesis rule: gen0_93 (NegativeClaimHighConfidenceSignal).
+# Tier 2 Structural — Layer 2 (Cortical Specialist).
+
+name: "negative-claim-confidence"
+version: "0.1.0"
+language: GO
+determinism: PURE
+
+ports {
+  name: "conversation_snapshot"
+  direction: IN
+  message_type: "cog.reasoning.v1.ConversationSnapshot"
+}
+
+ports {
+  name: "assessment"
+  direction: OUT
+  message_type: "cog.reasoning.v1.CognitiveAssessment"
+}
+
+ports {
+  name: "_error"
+  direction: OUT
+  message_type: "cog.core.v1.ErrorEvent"
+}
+
+contracts {
+  packages: "cog.reasoning.v1"
+  packages: "cog.core.v1"
+  proto_hash: "sha256:pending"
+}
+
+config {
+  fields {
+    name: "max_mv_threshold"
+    type: DOUBLE
+    default_value: "0.45"
+    required: false
+    description: "MaxMV threshold for negative-direction claims to fire (genesis: 0.4503)"
+    min_value: "0.0"
+    max_value: "1.0"
+    evolvable: true
+  }
+  fields {
+    name: "min_negative_sentences"
+    type: UINT32
+    default_value: "1"
+    required: false
+    description: "Minimum negative-direction sentences required before firing"
+    min_value: "1"
+    max_value: "20"
+    evolvable: true
+  }
+}
+
+description: "Tier2_Structural: fires CATHEDRAL_COMPLEXITY or COUNTER_EVIDENCE_DEPLETION when MaxMV of negative-direction assistant claims > 0.45. Genesis rule gen0_93 — novel signal path (claim-level MV for negative direction)."
+
+tags: "cognitive"
+tags: "cerebro"
+tags: "tier2"
+tags: "structural"
+tags: "fuzzy-threshold"
+tags: "pure"
+
+lineage {
+  level: GENESIS
+}
