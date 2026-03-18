@@ -1,0 +1,434 @@
+// Package main implements a cerebro-hook binary for Claude Code.
+//
+// It reads hook JSON from stdin, runs CereBRO's fuzzy 5-layer pipeline on the
+// accumulated session state, and outputs hook response JSON on stdout.
+//
+// Hook events: UserPromptSubmit, PostToolUse, Stop.
+// Passive mode: always returns continue=true.
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/SuperSeriousLab/fugo"
+
+	reasoningv1 "github.com/SuperSeriousLab/CereBRO/gen/go/cog/reasoning/v1"
+	"github.com/SuperSeriousLab/CereBRO/internal/pipeline"
+)
+
+const (
+	cerebroDir     = ".cerebro"
+	sessionsDir    = "sessions"
+	fisDir         = "config/fis"
+	maxInteraction = 20 // sliding window
+)
+
+// HookInput is the envelope received from Claude Code hooks.
+type HookInput struct {
+	SessionID        string          `json:"session_id"`
+	TranscriptPath   string          `json:"transcript_path"`
+	CWD              string          `json:"cwd"`
+	HookEventName    string          `json:"hook_event_name"`
+	LastAssistantMsg string          `json:"last_assistant_message"`
+	ToolName         string          `json:"tool_name"`
+	ToolInput        json.RawMessage `json:"tool_input"`
+	ToolResponse     string          `json:"tool_response"`
+	Prompt           string          `json:"prompt"`
+}
+
+// HookOutput is the response written back to Claude Code.
+type HookOutput struct {
+	Continue           bool                `json:"continue"`
+	HookSpecificOutput *HookSpecificOutput `json:"hookSpecificOutput,omitempty"`
+}
+
+// HookSpecificOutput carries hook-type-specific fields.
+type HookSpecificOutput struct {
+	HookEventName     string `json:"hookEventName"`
+	AdditionalContext string `json:"additionalContext,omitempty"`
+}
+
+// HookSession persists conversation state between hook invocations.
+type HookSession struct {
+	SessionID    string        `json:"session_id"`
+	Interactions []Interaction `json:"interactions"`
+	LastUpdated  time.Time     `json:"last_updated"`
+}
+
+// Interaction is a single turn in the conversation.
+type Interaction struct {
+	Role      string    `json:"role"`
+	Content   string    `json:"content"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+func main() {
+	var input HookInput
+	if err := json.NewDecoder(os.Stdin).Decode(&input); err != nil {
+		outputContinue()
+		return
+	}
+
+	switch input.HookEventName {
+	case "UserPromptSubmit":
+		handleUserPromptSubmit(input)
+	case "PostToolUse":
+		handlePostToolUse(input)
+	case "Stop":
+		handleStop(input)
+	default:
+		outputContinue()
+	}
+}
+
+func handleUserPromptSubmit(input HookInput) {
+	// Load session, append user prompt.
+	sess := loadSession(input.SessionID)
+
+	prompt := input.Prompt
+	if prompt == "" {
+		// Check for cached alerts from previous Stop event.
+		alerts := readAlertCache(input.SessionID)
+		if alerts != "" {
+			clearAlertCache(input.SessionID)
+			emitContext(alerts)
+			return
+		}
+		outputContinue()
+		return
+	}
+
+	if len(prompt) > 2000 {
+		prompt = prompt[:2000]
+	}
+
+	sess.Interactions = appendInteraction(sess.Interactions, Interaction{
+		Role:      "user",
+		Content:   prompt,
+		Timestamp: time.Now(),
+	})
+	saveSession(input.SessionID, sess)
+
+	// Check for cached alerts from previous Stop event.
+	alerts := readAlertCache(input.SessionID)
+	if alerts != "" {
+		clearAlertCache(input.SessionID)
+		emitContext(alerts)
+		return
+	}
+
+	outputContinue()
+}
+
+func handlePostToolUse(input HookInput) {
+	if input.ToolName == "" {
+		outputContinue()
+		return
+	}
+
+	sess := loadSession(input.SessionID)
+
+	toolResp := input.ToolResponse
+	if len(toolResp) > 1000 {
+		toolResp = toolResp[:1000]
+	}
+
+	text := fmt.Sprintf("[tool:%s] %s", input.ToolName, toolResp)
+	sess.Interactions = appendInteraction(sess.Interactions, Interaction{
+		Role:      "assistant",
+		Content:   text,
+		Timestamp: time.Now(),
+	})
+	saveSession(input.SessionID, sess)
+
+	outputContinue()
+}
+
+func handleStop(input HookInput) {
+	sess := loadSession(input.SessionID)
+
+	msg := input.LastAssistantMsg
+	if msg == "" {
+		outputContinue()
+		return
+	}
+
+	if len(msg) > 2000 {
+		msg = msg[:2000]
+	}
+
+	sess.Interactions = appendInteraction(sess.Interactions, Interaction{
+		Role:      "assistant",
+		Content:   msg,
+		Timestamp: time.Now(),
+	})
+	saveSession(input.SessionID, sess)
+
+	// Run the pipeline on the session.
+	result := runPipeline(sess)
+	if result == nil {
+		outputContinue()
+		return
+	}
+
+	summary := formatPipelineResult(result)
+	if summary == "" {
+		outputContinue()
+		return
+	}
+
+	// Cache the alert for next UserPromptSubmit.
+	writeAlertCache(input.SessionID, summary)
+	outputContinue()
+}
+
+// runPipeline builds a ConversationSnapshot from the session and runs the
+// CereBRO pipeline with all fuzzy components enabled.
+func runPipeline(sess *HookSession) *pipeline.PipelineResult {
+	if len(sess.Interactions) < 2 {
+		return nil // need at least a user + assistant turn
+	}
+
+	snap := buildSnapshot(sess)
+	cfg := buildPipelineConfig()
+
+	return pipeline.Run(snap, cfg)
+}
+
+// buildSnapshot converts session interactions into a proto ConversationSnapshot.
+func buildSnapshot(sess *HookSession) *reasoningv1.ConversationSnapshot {
+	turns := make([]*reasoningv1.Turn, 0, len(sess.Interactions))
+	for i, inter := range sess.Interactions {
+		turns = append(turns, &reasoningv1.Turn{
+			TurnNumber: uint32(i + 1),
+			Speaker:    inter.Role,
+			RawText:    inter.Content,
+		})
+	}
+	return &reasoningv1.ConversationSnapshot{
+		Turns:      turns,
+		TotalTurns: uint32(len(turns)),
+		Objective:  "claude_code_session",
+	}
+}
+
+// buildPipelineConfig constructs a pipeline config with fuzzy components.
+// Loads FIS configs from the source tree or ~/.cerebro/config/fis/.
+func buildPipelineConfig() pipeline.PipelineConfig {
+	cfg := pipeline.DefaultPipelineConfig()
+	cfg.UseInhibitor = true
+	cfg.UseNeuromodulation = true
+	cfg.UseMetacognition = false // skip for speed
+	cfg.UseSalience = false     // skip for speed
+	cfg.UseLayer0 = false       // skip for hook (not needed for Claude Code)
+
+	// Try to load FIS configs. If any fail, fall back to crisp.
+	fisPath := findFISDir()
+	if fisPath == "" {
+		return cfg
+	}
+
+	// L1: Fuzzy Urgency
+	if uc, err := fugo.LoadConfig(filepath.Join(fisPath, "l1_urgency.json")); err == nil {
+		if fu, err := pipeline.BuildFuzzyUrgency(uc); err == nil {
+			cfg.FuzzyUrgency = fu
+		}
+	}
+
+	// L2: Detector Fuzzy (severity replacement)
+	ancCfg, err1 := fugo.LoadConfig(filepath.Join(fisPath, "l2_anchoring_detector.json"))
+	conCfg, err2 := fugo.LoadConfig(filepath.Join(fisPath, "l2_contradiction_detector.json"))
+	calCfg, err3 := fugo.LoadConfig(filepath.Join(fisPath, "l2_calibrator_detector.json"))
+	scCfg, err4 := fugo.LoadConfig(filepath.Join(fisPath, "l2_sunk_cost_detector.json"))
+	if err1 == nil && err2 == nil && err3 == nil && err4 == nil {
+		if df, err := pipeline.BuildDetectorFuzzy(ancCfg, conCfg, calCfg, scCfg); err == nil {
+			cfg.DetectorFuzzy = df
+		}
+	}
+
+	// L3: Fuzzy Inhibitor
+	fmCfg, err1 := fugo.LoadConfig(filepath.Join(fisPath, "l3_formality_gate.json"))
+	svCfg, err2 := fugo.LoadConfig(filepath.Join(fisPath, "l3_severity_gate.json"))
+	evCfg, err3 := fugo.LoadConfig(filepath.Join(fisPath, "l3_evidence_gate.json"))
+	if err1 == nil && err2 == nil && err3 == nil {
+		if fi, err := pipeline.BuildFuzzyInhibitor(fmCfg, svCfg, evCfg); err == nil {
+			cfg.Inhibitor.Fuzzy = fi
+		}
+	}
+
+	// L4: Cross-Layer Arbitrator
+	if arCfg, err := fugo.LoadConfig(filepath.Join(fisPath, "cross_layer_arbitration.json")); err == nil {
+		if arb, err := pipeline.BuildCrossLayerArbitrator(arCfg); err == nil {
+			cfg.Arbitrator = arb
+		}
+	}
+
+	return cfg
+}
+
+// findFISDir looks for FIS config files in known locations.
+func findFISDir() string {
+	// 1. Source tree (for development).
+	// Resolve relative to executable path or well-known locations.
+	candidates := []string{
+		// Relative to CWD (for dev builds)
+		"config/fis",
+		// Home directory
+		filepath.Join(homeDir(), cerebroDir, fisDir),
+		// Source tree absolute path
+		"/home/js/eidos/CereBRO/config/fis",
+	}
+
+	for _, c := range candidates {
+		if _, err := os.Stat(filepath.Join(c, "l1_urgency.json")); err == nil {
+			return c
+		}
+	}
+	return ""
+}
+
+// formatPipelineResult produces a human-readable summary of pipeline findings.
+func formatPipelineResult(result *pipeline.PipelineResult) string {
+	if result == nil || result.Report == nil {
+		return ""
+	}
+
+	report := result.Report
+	if report.GetOverallIntegrityScore() >= 0.8 && len(report.GetFindings()) == 0 {
+		return "" // clean — nothing to report
+	}
+
+	var parts []string
+
+	// Report significant findings.
+	for _, f := range report.GetFindings() {
+		if f.GetConfidence() < 0.2 {
+			continue // below reporting threshold
+		}
+		parts = append(parts, fmt.Sprintf("- %s (%s, conf=%.2f): %s",
+			f.GetFindingType().String(),
+			f.GetSeverity().String(),
+			f.GetConfidence(),
+			f.GetExplanation(),
+		))
+	}
+
+	if len(parts) == 0 {
+		return ""
+	}
+
+	// Include arbitration if available.
+	arb := ""
+	if result.Arbitration != nil && result.Arbitration.CompoundPathology > 0.2 {
+		arb = fmt.Sprintf("\nCompound pathology: %.2f (%s)",
+			result.Arbitration.CompoundPathology, result.Arbitration.Action)
+	}
+
+	return fmt.Sprintf(
+		"CereBRO reasoning monitor (integrity=%.2f) detected:\n%s%s\n"+
+			"Consider whether these patterns are affecting your reasoning quality.",
+		report.GetOverallIntegrityScore(),
+		strings.Join(parts, "\n"),
+		arb,
+	)
+}
+
+func emitContext(alerts string) {
+	json.NewEncoder(os.Stdout).Encode(HookOutput{ //nolint:errcheck
+		Continue: true,
+		HookSpecificOutput: &HookSpecificOutput{
+			HookEventName:     "UserPromptSubmit",
+			AdditionalContext: alerts,
+		},
+	})
+}
+
+func outputContinue() {
+	json.NewEncoder(os.Stdout).Encode(HookOutput{Continue: true}) //nolint:errcheck
+}
+
+// --- Session persistence ---
+
+func sessionPath(sessionID string) string {
+	safe := sanitizeID(sessionID)
+	dir := filepath.Join(homeDir(), cerebroDir, sessionsDir)
+	_ = os.MkdirAll(dir, 0700)
+	return filepath.Join(dir, safe+".json")
+}
+
+func loadSession(sessionID string) *HookSession {
+	path := sessionPath(sessionID)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return &HookSession{SessionID: sessionID, LastUpdated: time.Now()}
+	}
+	var sess HookSession
+	if err := json.Unmarshal(data, &sess); err != nil {
+		return &HookSession{SessionID: sessionID, LastUpdated: time.Now()}
+	}
+	return &sess
+}
+
+func saveSession(sessionID string, sess *HookSession) {
+	sess.LastUpdated = time.Now()
+	data, err := json.Marshal(sess)
+	if err != nil {
+		return
+	}
+	_ = os.WriteFile(sessionPath(sessionID), data, 0600)
+}
+
+func appendInteraction(interactions []Interaction, i Interaction) []Interaction {
+	interactions = append(interactions, i)
+	if len(interactions) > maxInteraction {
+		interactions = interactions[len(interactions)-maxInteraction:]
+	}
+	return interactions
+}
+
+// --- Alert cache (cross-hook IPC) ---
+
+func alertCachePath(sessionID string) string {
+	safe := sanitizeID(sessionID)
+	return filepath.Join(os.TempDir(), "cerebro-alerts-"+safe)
+}
+
+func writeAlertCache(sessionID, alerts string) {
+	_ = os.WriteFile(alertCachePath(sessionID), []byte(alerts), 0600)
+}
+
+func readAlertCache(sessionID string) string {
+	data, err := os.ReadFile(alertCachePath(sessionID))
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+func clearAlertCache(sessionID string) {
+	_ = os.Remove(alertCachePath(sessionID))
+}
+
+// --- Helpers ---
+
+func sanitizeID(id string) string {
+	safe := strings.ReplaceAll(id, "/", "_")
+	safe = strings.ReplaceAll(safe, "..", "_")
+	safe = strings.ReplaceAll(safe, "\\", "_")
+	if len(safe) > 128 {
+		safe = safe[:128]
+	}
+	return safe
+}
+
+func homeDir() string {
+	if h, err := os.UserHomeDir(); err == nil {
+		return h
+	}
+	return "/tmp"
+}
