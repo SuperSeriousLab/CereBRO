@@ -3163,3 +3163,244 @@ func DetectAssumptionSurfacer(snap *reasoningv1.ConversationSnapshot, cfg Assump
 		DetectorName:  "assumption-surfacer-detector",
 	}
 }
+
+// ============================================================
+// CircularReasoning Detector (Phase 9, Tier2_Structural)
+// ============================================================
+//
+// Detects when an agent restates a claim as its own justification — the
+// conclusion is used as a premise. "X is true because X is true" pattern.
+//
+// Signal logic (pure text, no LLM calls):
+//   - Split each assistant turn into sentences (on '.', '!', '?', ';')
+//   - For each sentence pair (A, B) in a turn, compute Jaccard word-overlap
+//     (stop words excluded). If similarity > SimilarityThreshold AND one
+//     sentence contains a causal connector → mark as a circular pair.
+//   - Aggregate: circular_turns / total_turns_with_content
+//   - Fire when circular_turns >= MinCircularTurns AND ratio > CircularRatioThreshold
+//   - Confidence = 0.5 + 0.5 * (ratio - threshold) / (1 - threshold)
+//   - Severity: HIGH if ratio > 0.6, MEDIUM if > threshold
+//
+// Finding type: UNSUPPORTED_CONCLUSION
+// Tier: Tier2_Structural
+// Layer: 2 (Cortical Specialists / Detectors)
+
+// CircularReasoningConfig holds parameters for the CircularReasoning detector.
+type CircularReasoningConfig struct {
+	// SimilarityThreshold: minimum Jaccard similarity between two sentences to
+	// consider them potentially circular. Default: 0.55.
+	SimilarityThreshold float64
+	// CircularRatioThreshold: minimum circular_turns/total_turns ratio to fire.
+	// Default: 0.35.
+	CircularRatioThreshold float64
+	// MinCircularTurns: minimum number of turns that must contain circular pairs
+	// before firing. Default: 2.
+	MinCircularTurns int
+}
+
+// DefaultCircularReasoningConfig returns the default configuration.
+func DefaultCircularReasoningConfig() CircularReasoningConfig {
+	return CircularReasoningConfig{
+		SimilarityThreshold:    0.55,
+		CircularRatioThreshold: 0.35,
+		MinCircularTurns:       2,
+	}
+}
+
+// circularStopWords is the set of words excluded from Jaccard computation.
+// Single-word causal connectors are also excluded because connector presence
+// is checked separately — including them skews the similarity score downward
+// for the sentence that contains the connector.
+var circularStopWords = map[string]bool{
+	"the": true, "a": true, "an": true, "is": true, "are": true,
+	"was": true, "were": true, "it": true, "this": true, "that": true,
+	"and": true, "or": true, "but": true, "of": true, "to": true,
+	"in": true, "for": true, "on": true, "with": true, "as": true,
+	"by": true,
+	// single-word causal connectors (multi-word connectors checked via substring)
+	"because": true, "since": true, "therefore": true, "thus": true,
+	"hence": true, "so": true, "consequently": true,
+}
+
+// circularCausalConnectors are connectors that signal a reasoning relationship.
+var circularCausalConnectors = []string{
+	"because", "since", "therefore", "thus", "hence", "so",
+	"consequently", "which means", "that's why", "this is why",
+}
+
+// circularSplitSentences splits text into sentences on '.', '!', '?', ';'.
+func circularSplitSentences(text string) []string {
+	var sentences []string
+	var current []rune
+	for _, r := range text {
+		if r == '.' || r == '!' || r == '?' || r == ';' {
+			s := strings.TrimSpace(string(current))
+			if s != "" {
+				sentences = append(sentences, s)
+			}
+			current = current[:0]
+		} else {
+			current = append(current, r)
+		}
+	}
+	if s := strings.TrimSpace(string(current)); s != "" {
+		sentences = append(sentences, s)
+	}
+	return sentences
+}
+
+// circularContentWords tokenizes a sentence into lowercase content words,
+// excluding stop words.
+func circularContentWords(sentence string) map[string]bool {
+	words := make(map[string]bool)
+	lower := strings.ToLower(sentence)
+	// Split on whitespace and punctuation boundaries.
+	var word []rune
+	for _, r := range lower {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			word = append(word, r)
+		} else {
+			if len(word) > 0 {
+				w := string(word)
+				if !circularStopWords[w] {
+					words[w] = true
+				}
+				word = word[:0]
+			}
+		}
+	}
+	if len(word) > 0 {
+		w := string(word)
+		if !circularStopWords[w] {
+			words[w] = true
+		}
+	}
+	return words
+}
+
+// circularJaccard computes the Jaccard similarity of two content-word sets.
+// Returns 0.0 if both sets are empty.
+func circularJaccard(a, b map[string]bool) float64 {
+	if len(a) == 0 && len(b) == 0 {
+		return 0.0
+	}
+	intersect := 0
+	for w := range a {
+		if b[w] {
+			intersect++
+		}
+	}
+	union := len(a) + len(b) - intersect
+	if union == 0 {
+		return 0.0
+	}
+	return float64(intersect) / float64(union)
+}
+
+// circularHasCausalConnector reports whether a sentence contains any causal
+// connector from the list.
+func circularHasCausalConnector(lower string) bool {
+	for _, c := range circularCausalConnectors {
+		if strings.Contains(lower, c) {
+			return true
+		}
+	}
+	return false
+}
+
+// circularTurnHasCircularPair reports whether any sentence pair within a turn
+// forms a circular reasoning pair: high similarity + causal connector present.
+func circularTurnHasCircularPair(text string, similarityThreshold float64) bool {
+	sentences := circularSplitSentences(text)
+	if len(sentences) < 2 {
+		return false
+	}
+	type sentInfo struct {
+		words map[string]bool
+		lower string
+	}
+	infos := make([]sentInfo, len(sentences))
+	for i, s := range sentences {
+		infos[i] = sentInfo{words: circularContentWords(s), lower: strings.ToLower(s)}
+	}
+	for i := 0; i < len(infos); i++ {
+		for j := i + 1; j < len(infos); j++ {
+			sim := circularJaccard(infos[i].words, infos[j].words)
+			if sim > similarityThreshold {
+				// Check if either sentence contains a causal connector.
+				if circularHasCausalConnector(infos[i].lower) || circularHasCausalConnector(infos[j].lower) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// DetectCircularReasoning fires UNSUPPORTED_CONCLUSION when the assistant
+// restates a conclusion as its own premise across multiple turns.
+// Implements Phase 9 Tier2_Structural — circular-reasoning-detector.
+func DetectCircularReasoning(snap *reasoningv1.ConversationSnapshot, cfg CircularReasoningConfig) *reasoningv1.CognitiveAssessment {
+	if snap == nil {
+		return nil
+	}
+
+	totalContentTurns := 0
+	circularTurns := 0
+	var relevantTurns []uint32
+
+	for _, turn := range snap.GetTurns() {
+		if turn.GetSpeaker() != "assistant" {
+			continue
+		}
+		text := strings.TrimSpace(turn.GetRawText())
+		if text == "" {
+			continue
+		}
+		totalContentTurns++
+		if circularTurnHasCircularPair(text, cfg.SimilarityThreshold) {
+			circularTurns++
+			relevantTurns = append(relevantTurns, turn.GetTurnNumber())
+		}
+	}
+
+	if totalContentTurns == 0 {
+		return nil
+	}
+
+	ratio := float64(circularTurns) / float64(totalContentTurns)
+
+	if circularTurns < cfg.MinCircularTurns || ratio <= cfg.CircularRatioThreshold {
+		return nil
+	}
+
+	// Confidence: 0.5 at threshold, approaches 1.0 as ratio → 1.0.
+	remaining := 1.0 - cfg.CircularRatioThreshold
+	if remaining <= 0 {
+		remaining = 1.0
+	}
+	confidence := 0.5 + 0.5*(ratio-cfg.CircularRatioThreshold)/remaining
+	if confidence > 1.0 {
+		confidence = 1.0
+	}
+
+	severity := reasoningv1.FindingSeverity_WARNING
+	if ratio > 0.6 {
+		severity = reasoningv1.FindingSeverity_CRITICAL
+	}
+
+	explanation := "CircularReasoning: circular_turns=" + uintToString(uint32(circularTurns)) +
+		" total_content_turns=" + uintToString(uint32(totalContentTurns)) +
+		" circular_ratio=" + formatFloat(ratio) +
+		" > threshold=" + formatFloat(cfg.CircularRatioThreshold) +
+		". Conclusion restated as premise — self-referential justification detected."
+
+	return &reasoningv1.CognitiveAssessment{
+		FindingType:   reasoningv1.FindingType_UNSUPPORTED_CONCLUSION,
+		Severity:      severity,
+		Explanation:   explanation,
+		RelevantTurns: relevantTurns,
+		Confidence:    confidence,
+		DetectorName:  "circular-reasoning-detector",
+	}
+}

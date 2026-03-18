@@ -24,6 +24,7 @@ const (
 	DetectorUnderevidencedClaims    Detector = "underevidenced-claims"
 	DetectorNegativeClaim         Detector = "negative-claim-confidence"
 	DetectorAssumptionSurfacer    Detector = "assumption-surfacer-detector"
+	DetectorCircularReasoning     Detector = "circular-reasoning-detector"
 )
 
 // RouterConfig holds activation thresholds.
@@ -276,6 +277,20 @@ func Route(snap *reasoningv1.ConversationSnapshot, cfg RouterConfig) RoutingDeci
 			reasons = append(reasons, "assistant turns present — checking for unstated assumption chains")
 			break
 		}
+	}
+
+	// CircularReasoning: activate when conversation has ≥ 2 assistant turns.
+	// Phase 9, Tier2_Structural — detects self-referential justification (X because X).
+	// Fires UNSUPPORTED_CONCLUSION when circular_turns >= 2 and circular_ratio > 0.35.
+	assistantTurnCount := 0
+	for _, t := range turns {
+		if strings.ToLower(t.GetSpeaker()) == "assistant" {
+			assistantTurnCount++
+		}
+	}
+	if assistantTurnCount >= 2 {
+		activated = append(activated, DetectorCircularReasoning)
+		reasons = append(reasons, "multiple assistant turns present — checking for circular self-referential reasoning")
 	}
 
 	return RoutingDecision{Activated: activated, Reasons: reasons}

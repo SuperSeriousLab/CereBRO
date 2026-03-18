@@ -1,0 +1,83 @@
+# Circular Reasoning COG manifest.
+# PURE deterministic — detects self-referential justification in assistant turns.
+# Fires UNSUPPORTED_CONCLUSION when circular_turns >= 2 and circular_ratio > 0.35.
+# Phase 9, Tier2_Structural — Layer 2 (Cortical Specialists / Detectors).
+
+name: "circular-reasoning-detector"
+version: "0.1.0"
+language: GO
+determinism: PURE
+
+ports {
+  name: "conversation_snapshot"
+  direction: IN
+  message_type: "cog.reasoning.v1.ConversationSnapshot"
+}
+
+ports {
+  name: "assessment"
+  direction: OUT
+  message_type: "cog.reasoning.v1.CognitiveAssessment"
+}
+
+ports {
+  name: "_error"
+  direction: OUT
+  message_type: "cog.core.v1.ErrorEvent"
+}
+
+contracts {
+  packages: "cog.reasoning.v1"
+  packages: "cog.core.v1"
+  proto_hash: "sha256:pending"
+}
+
+config {
+  fields {
+    name: "similarity_threshold"
+    type: DOUBLE
+    default_value: "0.55"
+    required: false
+    description: "Minimum Jaccard word-overlap similarity between two sentences to flag as potentially circular"
+    min_value: "0.0"
+    max_value: "1.0"
+    evolvable: true
+  }
+  fields {
+    name: "circular_ratio_threshold"
+    type: DOUBLE
+    default_value: "0.35"
+    required: false
+    description: "Minimum circular_turns/total_turns ratio required to fire"
+    min_value: "0.0"
+    max_value: "1.0"
+    evolvable: true
+  }
+  fields {
+    name: "min_circular_turns"
+    type: UINT32
+    default_value: "2"
+    required: false
+    description: "Minimum number of turns containing circular pairs before firing"
+    min_value: "1"
+    max_value: "20"
+    evolvable: true
+  }
+}
+
+description: "Detects self-referential circular reasoning — fires UNSUPPORTED_CONCLUSION when the agent restates a conclusion as its own premise (X because X). circular_ratio = circular_turns / total_turns > 0.35 and circular_turns >= 2. Phase 9, Tier2_Structural."
+
+tags: "cognitive"
+tags: "cerebro"
+tags: "tier2-structural"
+tags: "pure"
+tags: "phase9"
+
+lineage {
+  level: HAND_CRAFTED
+  genesis_rule: "phase9-circular-reasoning"
+  source_corpus: "full-v4.ndjson"
+  fitness: 0.0
+  precision: 0.0
+  recall: 0.0
+}
