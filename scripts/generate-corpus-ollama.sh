@@ -7,7 +7,7 @@ set -uo pipefail
 
 CEREBRO_DIR="/home/js/eidos/CereBRO"
 OLLAMA_ENDPOINT="${OLLAMA_ENDPOINT:-http://10.70.70.14:11434}"
-MODEL="${MODEL:-gemma3:4b}"
+MODEL="${MODEL:-glm-4.7-flash:q4_K_M}"
 OUTPUT_FILE="$CEREBRO_DIR/data/corpus/full-v4.ndjson"
 DELAY=3
 
@@ -195,7 +195,7 @@ for i, c in enumerate(text):
             --argjson patho "$is_patho" \
             --argjson turns "$CEREBRO_TURNS" \
             --argjson expected "$EXPECTED" \
-            --arg source "ollama-direct-gemma3" \
+            --arg source "ollama-direct-glm47flash" \
             --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --argjson turn_count "$TURN_COUNT" \
             '{
