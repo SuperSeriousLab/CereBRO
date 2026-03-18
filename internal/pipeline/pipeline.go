@@ -45,7 +45,8 @@ type PipelineConfig struct {
 	ConceptualAnchoring ConceptualAnchoringConfig // Tier 2: conceptual anchoring detector
 	InheritedPosition   InheritedPositionConfig   // Tier 2: inherited-position detector
 	EvidenceAsymmetry        EvidenceAsymmetryConfig        // Tier 2: evidence grounding asymmetry detector (gen4_78+gen4_86)
-	SustainedConviction      SustainedConvictionConfig      // Tier 1: sustained conviction rolling-MV detector (gen0_76)
+	SustainedConviction      SustainedConvictionConfig      // Tier 1: sustained conviction rolling-MV detector (gen0_76, v5: window=5, threshold=0.595)
+	SustainedConvictionWide  SustainedConvictionConfig      // Tier 1: sustained conviction wider-window variant (dccd40d7, v7: window=7, threshold=0.338)
 	UnderevidencedClaims     UnderevidencedClaimsConfig     // Tier 1: evidence-to-positive-claim ratio detector (gen10_89)
 	NegativeClaim            NegativeClaimConfig            // Tier 2: MaxMV(negative-direction claims) > 0.45 (gen0_93)
 	DetectorFuzzy       *DetectorFuzzy            // L2 fuzzy severity (nil = crisp fallback)
@@ -115,7 +116,8 @@ func DefaultPipelineConfig() PipelineConfig {
 		ConceptualAnchoring: DefaultConceptualAnchoringConfig(),
 		InheritedPosition:   DefaultInheritedPositionConfig(),
 		EvidenceAsymmetry:    DefaultEvidenceAsymmetryConfig(),
-		SustainedConviction:  DefaultSustainedConvictionConfig(),
+		SustainedConviction:     DefaultSustainedConvictionConfig(),
+		SustainedConvictionWide: DefaultSustainedConvictionWideConfig(),
 		UnderevidencedClaims: DefaultUnderevidencedClaimsConfig(),
 		NegativeClaim:        DefaultNegativeClaimConfig(),
 	}
@@ -603,6 +605,14 @@ func buildDetectorMap(cfg PipelineConfig) map[Detector]DetectorFunc {
 	// exceeds 0.595. Implements gen0_76 (SustainedConvictionSignal_v5). Tier1_Bias.
 	m[DetectorSustainedConviction] = func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
 		return DetectSustainedConviction(snap, cfg.SustainedConviction)
+	}
+
+	// SustainedConvictionWide: fires when peak-window avg MV of any 7 consecutive
+	// assistant-turn claims exceeds 0.338. Implements dccd40d7 (SustainedConvictionSignal_v7).
+	// Wider window + lower threshold catches slower-onset conviction over longer arcs.
+	// Tier1_Bias — complements v5 without replacing it.
+	m[DetectorSustainedConvictionWide] = func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
+		return DetectSustainedConviction(snap, cfg.SustainedConvictionWide)
 	}
 
 	// UnderevidencedClaims: fires when evidence_turns/positive_claim_turns <= 0.331.

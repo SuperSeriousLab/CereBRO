@@ -1,0 +1,79 @@
+# UnderevidencedClaims COG manifest.
+# Tier1_Bias FuzzyRatioCOG — fires when evidence-to-positive-claim ratio <= 0.331.
+# Captures SYCOPHANCY and CONFIDENCE_MISCALIBRATION when positive claims outpace evidence.
+# Phase 3 — Layer 2 (Cortical Specialists).
+
+name: "underevidenced-claims"
+version: "0.1.0"
+language: GO
+determinism: PURE
+
+ports {
+  name: "conversation_snapshot"
+  direction: IN
+  message_type: "cog.reasoning.v1.ConversationSnapshot"
+}
+
+ports {
+  name: "assessment"
+  direction: OUT
+  message_type: "cog.reasoning.v1.CognitiveAssessment"
+}
+
+ports {
+  name: "_error"
+  direction: OUT
+  message_type: "cog.core.v1.ErrorEvent"
+}
+
+contracts {
+  packages: "cog.reasoning.v1"
+  packages: "cog.core.v1"
+  proto_hash: "sha256:pending"
+}
+
+config {
+  fields {
+    name: "ratio_threshold"
+    type: DOUBLE
+    default_value: "0.331"
+    required: false
+    description: "Evidence-to-positive-claim ratio threshold. Fires when ratio <= this value."
+    min_value: "0.0"
+    max_value: "1.0"
+    evolvable: true
+    gain_target: true
+  }
+  fields {
+    name: "min_positive_claims"
+    type: UINT32
+    default_value: "2"
+    required: false
+    description: "Minimum number of positive claims required to fire (prevents false positives on short inputs)"
+    min_value: "1"
+    max_value: "100"
+    evolvable: false
+  }
+}
+
+description: "Detects when evidence-to-positive-claim ratio is low (<=0.331), signalling that the assistant makes more positive assessments than it supports with evidence — characteristic of SYCOPHANCY and CONFIDENCE_MISCALIBRATION."
+
+tags: "cognitive"
+tags: "cerebro"
+tags: "layer2"
+tags: "pure"
+tags: "tier1_bias"
+tags: "fuzzy_ratio"
+
+lineage {
+  level: HAND_WRITTEN
+}
+
+genesis_spec {
+  rule_id: "gen10_89"
+  rule_name: "UndevidencedPositiveClaimRatio"
+  source_corpus: "/home/js/eidos/CereBRO/data/corpus/full-v4.ndjson"
+  precision: 1.0
+  recall: 1.0
+  fitness: 94.21
+}

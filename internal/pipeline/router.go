@@ -19,8 +19,9 @@ const (
 	DetectorConceptualAnchoring   Detector = "conceptual-anchoring-detector"
 	DetectorInheritedPosition     Detector = "inherited-position-detector"
 	DetectorEvidenceAsymmetry     Detector = "evidence-asymmetry-detector"
-	DetectorSustainedConviction   Detector = "sustained-conviction-detector"
-	DetectorUnderevidencedClaims  Detector = "underevidenced-claims"
+	DetectorSustainedConviction     Detector = "sustained-conviction-detector"
+	DetectorSustainedConvictionWide Detector = "sustained-conviction-wide-detector"
+	DetectorUnderevidencedClaims    Detector = "underevidenced-claims"
 	DetectorNegativeClaim         Detector = "negative-claim-confidence"
 )
 
@@ -227,10 +228,14 @@ func Route(snap *reasoningv1.ConversationSnapshot, cfg RouterConfig) RoutingDeci
 
 	// SustainedConviction: activate on any conversation with at least 1 assistant turn.
 	// Tier1_Bias — checks rolling MV of recent claims for pathological conviction patterns.
+	// Both v5 (window=5, threshold=0.595) and v7 (window=7, threshold=0.338) are activated
+	// together; v7 catches slower-onset conviction over a longer arc.
 	for _, t := range turns {
 		if strings.ToLower(t.GetSpeaker()) == "assistant" {
 			activated = append(activated, DetectorSustainedConviction)
-			reasons = append(reasons, "assistant turns present — checking sustained conviction signal")
+			reasons = append(reasons, "assistant turns present — checking sustained conviction signal (v5, window=5)")
+			activated = append(activated, DetectorSustainedConvictionWide)
+			reasons = append(reasons, "assistant turns present — checking sustained conviction signal (v7, window=7)")
 			break
 		}
 	}

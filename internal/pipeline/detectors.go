@@ -2257,6 +2257,9 @@ type SustainedConvictionConfig struct {
 	FireThreshold float64
 	// MinAssistantTurns is the minimum assistant turns required before detection runs (default 1).
 	MinAssistantTurns int
+	// DetectorName overrides the DetectorName field in the returned CognitiveAssessment.
+	// Empty string falls back to the canonical "sustained-conviction-detector".
+	DetectorName string
 }
 
 // DefaultSustainedConvictionConfig returns production-tuned defaults from gen0_76.
@@ -2265,6 +2268,19 @@ func DefaultSustainedConvictionConfig() SustainedConvictionConfig {
 		WindowN:           5,
 		FireThreshold:     0.595,
 		MinAssistantTurns: 1,
+	}
+}
+
+// DefaultSustainedConvictionWideConfig returns the v7 wider-window variant config
+// (dccd40d7: SustainedConvictionSignal_v7). WindowN=7 with a lower threshold of 0.338
+// catches slower-onset conviction patterns over a longer conversation arc — cases that
+// build gradually across many turns and evade the tighter v5 window.
+func DefaultSustainedConvictionWideConfig() SustainedConvictionConfig {
+	return SustainedConvictionConfig{
+		WindowN:           7,
+		FireThreshold:     0.338,
+		MinAssistantTurns: 1,
+		DetectorName:      "sustained-conviction-wide-detector",
 	}
 }
 
@@ -2509,12 +2525,17 @@ func DetectSustainedConviction(snap *reasoningv1.ConversationSnapshot, cfg Susta
 		"High-conviction discourse patterns sustained without appropriate qualification — " +
 		"characteristic of sycophancy and cathedral-complexity."
 
+	detectorName := cfg.DetectorName
+	if detectorName == "" {
+		detectorName = "sustained-conviction-detector"
+	}
+
 	return &reasoningv1.CognitiveAssessment{
 		FindingType:  reasoningv1.FindingType_SYCOPHANCY,
 		Severity:     severity,
 		Explanation:  explanation,
 		Confidence:   normSev,
-		DetectorName: "sustained-conviction-detector",
+		DetectorName: detectorName,
 	}
 }
 
