@@ -23,13 +23,15 @@ for i in $(seq 1 "$COUNT"); do
 
     SYSTEM_PROMPT=$(cat "$PROMPT_FILE")
 
+    # GLM-4.7-flash:q4_K_M: 8/10 schema-valid (vs gemma3:4b 0/10), switched 2026-03-18
+    # Do NOT add "format":"json" — GLM returns empty responses under that constraint
     RESPONSE=$(curl -s --max-time 180 -X POST "$SLR_ENDPOINT/v1/chat/completions" \
       -H "Content-Type: application/json" \
       -d "$(jq -n \
         --arg sys "$SYSTEM_PROMPT" \
         --arg usr "Generate a realistic multi-turn conversation (8-15 turns) between two participants. Format as JSON: {\"turns\": [{\"speaker\": \"A\", \"text\": \"...\"}, ...], \"topic\": \"brief topic description\"}. Make it natural — include hesitations, tangents, and imperfect reasoning." \
         '{
-          "model": "auto",
+          "model": "glm-4.7-flash:q4_K_M",
           "messages": [
             {"role": "system", "content": $sys},
             {"role": "user", "content": $usr}
@@ -42,7 +44,7 @@ for i in $(seq 1 "$COUNT"); do
     CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // empty' 2>/dev/null)
 
     if [[ -n "$CONTENT" ]]; then
-        # Strip markdown code fences if present
+        # Strip markdown fences if present (GLM wraps JSON in ```json...``` blocks)
         CLEAN=$(echo "$CONTENT" | sed '/^```/d')
         # Validate JSON before writing — skip truncated responses
         if echo "$CLEAN" | jq '.' > /dev/null 2>&1; then
