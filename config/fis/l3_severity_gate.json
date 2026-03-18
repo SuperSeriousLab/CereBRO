@@ -1,0 +1,148 @@
+{
+  "name": "l3_severity_gate",
+  "defuzz_method": "centroid",
+  "centroid_resolution": 200,
+  "input_variables": [
+    {
+      "name": "severity",
+      "min": 0.0,
+      "max": 3.0,
+      "terms": [
+        {
+          "name": "low",
+          "Trapezoidal": { "a": 0.0, "b": 0.0, "c": 0.5, "d": 1.5 }
+        },
+        {
+          "name": "medium",
+          "Triangular": { "a": 0.5, "b": 1.5, "c": 2.5 }
+        },
+        {
+          "name": "high",
+          "Trapezoidal": { "a": 1.5, "b": 2.5, "c": 3.0, "d": 3.0 }
+        }
+      ]
+    },
+    {
+      "name": "urgency",
+      "min": 0.0,
+      "max": 1.0,
+      "terms": [
+        {
+          "name": "low",
+          "Trapezoidal": { "a": 0.0, "b": 0.0, "c": 0.15, "d": 0.4 }
+        },
+        {
+          "name": "moderate",
+          "Triangular": { "a": 0.2, "b": 0.5, "c": 0.8 }
+        },
+        {
+          "name": "high",
+          "Trapezoidal": { "a": 0.6, "b": 0.85, "c": 1.0, "d": 1.0 }
+        }
+      ]
+    }
+  ],
+  "output_variables": [
+    {
+      "name": "inhibition_strength",
+      "min": 0.0,
+      "max": 1.0,
+      "terms": [
+        {
+          "name": "none",
+          "Trapezoidal": { "a": 0.0, "b": 0.0, "c": 0.05, "d": 0.15 }
+        },
+        {
+          "name": "weak",
+          "Triangular": { "a": 0.05, "b": 0.25, "c": 0.45 }
+        },
+        {
+          "name": "moderate",
+          "Triangular": { "a": 0.3, "b": 0.5, "c": 0.7 }
+        },
+        {
+          "name": "strong",
+          "Triangular": { "a": 0.55, "b": 0.75, "c": 0.95 }
+        },
+        {
+          "name": "full",
+          "Trapezoidal": { "a": 0.85, "b": 0.95, "c": 1.0, "d": 1.0 }
+        }
+      ]
+    }
+  ],
+  "rules": [
+    {
+      "conditions": [
+        { "variable": "severity", "term": "low" },
+        { "variable": "urgency", "term": "low" }
+      ],
+      "connector": "and",
+      "consequent": { "variable": "inhibition_strength", "term": "full" }
+    },
+    {
+      "conditions": [
+        { "variable": "severity", "term": "low" },
+        { "variable": "urgency", "term": "moderate" }
+      ],
+      "connector": "and",
+      "consequent": { "variable": "inhibition_strength", "term": "strong" }
+    },
+    {
+      "conditions": [
+        { "variable": "severity", "term": "low" },
+        { "variable": "urgency", "term": "high" }
+      ],
+      "connector": "and",
+      "consequent": { "variable": "inhibition_strength", "term": "moderate" }
+    },
+    {
+      "conditions": [
+        { "variable": "severity", "term": "medium" },
+        { "variable": "urgency", "term": "low" }
+      ],
+      "connector": "and",
+      "consequent": { "variable": "inhibition_strength", "term": "moderate" }
+    },
+    {
+      "conditions": [
+        { "variable": "severity", "term": "medium" },
+        { "variable": "urgency", "term": "moderate" }
+      ],
+      "connector": "and",
+      "consequent": { "variable": "inhibition_strength", "term": "weak" }
+    },
+    {
+      "conditions": [
+        { "variable": "severity", "term": "medium" },
+        { "variable": "urgency", "term": "high" }
+      ],
+      "connector": "and",
+      "consequent": { "variable": "inhibition_strength", "term": "none" }
+    },
+    {
+      "conditions": [
+        { "variable": "severity", "term": "high" },
+        { "variable": "urgency", "term": "low" }
+      ],
+      "connector": "and",
+      "consequent": { "variable": "inhibition_strength", "term": "weak" }
+    },
+    {
+      "conditions": [
+        { "variable": "severity", "term": "high" },
+        { "variable": "urgency", "term": "moderate" }
+      ],
+      "connector": "and",
+      "consequent": { "variable": "inhibition_strength", "term": "none" }
+    },
+    {
+      "conditions": [
+        { "variable": "severity", "term": "high" },
+        { "variable": "urgency", "term": "high" }
+      ],
+      "connector": "and",
+      "consequent": { "variable": "inhibition_strength", "term": "none" }
+    }
+  ]
+}

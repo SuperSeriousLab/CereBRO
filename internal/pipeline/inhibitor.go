@@ -4,10 +4,72 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/SuperSeriousLab/fugo"
+	"google.golang.org/protobuf/proto"
+
 	cerebrov1 "github.com/SuperSeriousLab/CereBRO/gen/go/cerebro/v1"
 	reasoningv1 "github.com/SuperSeriousLab/CereBRO/gen/go/cog/reasoning/v1"
 	"github.com/SuperSeriousLab/CereBRO/internal/textutil"
 )
+
+// FIS config names used in the FisRegistry for L3 gates.
+const (
+	FISFormality = "l3_formality_gate"
+	FISSeverity  = "l3_severity_gate"
+	FISEvidence  = "l3_evidence_gate"
+)
+
+// FuzzyInhibitor holds pre-built fugo engines for fuzzy gate evaluation.
+// When nil, the inhibitor falls back to crisp binary logic.
+type FuzzyInhibitor struct {
+	FormalityEngine *fugo.FuzzyEngine
+	SeverityEngine  *fugo.FuzzyEngine
+	EvidenceEngine  *fugo.FuzzyEngine
+}
+
+// BuildFuzzyInhibitor constructs a FuzzyInhibitor from individual FIS configs.
+// Returns nil and an error if any config fails to build.
+func BuildFuzzyInhibitor(formalityCfg, severityCfg, evidenceCfg *fugo.FisConfig) (*FuzzyInhibitor, error) {
+	fe, err := formalityCfg.BuildEngine()
+	if err != nil {
+		return nil, fmt.Errorf("formality FIS: %w", err)
+	}
+	se, err := severityCfg.BuildEngine()
+	if err != nil {
+		return nil, fmt.Errorf("severity FIS: %w", err)
+	}
+	ee, err := evidenceCfg.BuildEngine()
+	if err != nil {
+		return nil, fmt.Errorf("evidence FIS: %w", err)
+	}
+	return &FuzzyInhibitor{
+		FormalityEngine: fe,
+		SeverityEngine:  se,
+		EvidenceEngine:  ee,
+	}, nil
+}
+
+// BuildFuzzyInhibitorFromRegistry constructs a FuzzyInhibitor from a FisRegistry.
+// Looks up configs by the standard gate names (l3_formality_gate, etc.).
+func BuildFuzzyInhibitorFromRegistry(reg *fugo.FisRegistry) (*FuzzyInhibitor, error) {
+	fe, err := reg.BuildEngine(FISFormality)
+	if err != nil {
+		return nil, fmt.Errorf("formality FIS: %w", err)
+	}
+	se, err := reg.BuildEngine(FISSeverity)
+	if err != nil {
+		return nil, fmt.Errorf("severity FIS: %w", err)
+	}
+	ee, err := reg.BuildEngine(FISEvidence)
+	if err != nil {
+		return nil, fmt.Errorf("evidence FIS: %w", err)
+	}
+	return &FuzzyInhibitor{
+		FormalityEngine: fe,
+		SeverityEngine:  se,
+		EvidenceEngine:  ee,
+	}, nil
+}
 
 // InhibitorConfig holds the Context Inhibitor's tunable parameters.
 type InhibitorConfig struct {
@@ -17,6 +79,7 @@ type InhibitorConfig struct {
 	StakesThreshold         float64
 	CasualHedgeWords        []string
 	ProximityWindowTurns    uint32
+	Fuzzy                   *FuzzyInhibitor // optional; nil = crisp fallback
 }
 
 // DefaultInhibitorConfig returns the Phase 1 default configuration.
@@ -86,12 +149,25 @@ func inhibitInternal(
 	var decisions []*cerebrov1.InhibitionDecision
 	var gated []*reasoningv1.CognitiveAssessment
 
-	for _, a := range assessments {
-		d := evaluateDisinhibition(a, assessments, snap, formality, urgency,
-			activeDetectors, turnFindings, cfg)
-		decisions = append(decisions, d)
-		if d.GetAction() == cerebrov1.InhibitionAction_DISINHIBITED {
-			gated = append(gated, a)
+	if cfg.Fuzzy != nil {
+		// Fuzzy path: evaluate FIS gates, apply multiplicative suppression.
+		for _, a := range assessments {
+			d, suppressed := evaluateFuzzyInhibition(a, assessments, snap,
+				formality, urgency, activeDetectors, turnFindings, cfg)
+			decisions = append(decisions, d)
+			if d.GetAction() == cerebrov1.InhibitionAction_DISINHIBITED {
+				gated = append(gated, suppressed)
+			}
+		}
+	} else {
+		// Crisp path: original 5-gate binary logic.
+		for _, a := range assessments {
+			d := evaluateDisinhibition(a, assessments, snap, formality, urgency,
+				activeDetectors, turnFindings, cfg)
+			decisions = append(decisions, d)
+			if d.GetAction() == cerebrov1.InhibitionAction_DISINHIBITED {
+				gated = append(gated, a)
+			}
 		}
 	}
 
@@ -163,6 +239,115 @@ func evaluateDisinhibition(
 	// All gates passed.
 	return makeDecision(fid, cerebrov1.InhibitionAction_DISINHIBITED,
 		"all_gates_passed", corr, finding)
+}
+
+// evaluateFuzzyInhibition runs fuzzy FIS evaluation on gates 1, 3, 4, 5.
+// Gate 1 (casual hedge) and Gate 2 (CRITICAL auto-pass) remain crisp overrides.
+// For gates 3–5, the FIS engines produce inhibition_strength in [0,1].
+// The finding's confidence is multiplied by (1 - max_inhibition_strength).
+// Returns the decision and a (possibly suppressed) copy of the assessment.
+func evaluateFuzzyInhibition(
+	finding *reasoningv1.CognitiveAssessment,
+	allFindings []*reasoningv1.CognitiveAssessment,
+	snap *reasoningv1.ConversationSnapshot,
+	formality, urgency float64,
+	activeDetectors map[string]bool,
+	turnFindings map[uint32][]*reasoningv1.CognitiveAssessment,
+	cfg InhibitorConfig,
+) (*cerebrov1.InhibitionDecision, *reasoningv1.CognitiveAssessment) {
+	fid := findingID(finding)
+	fz := cfg.Fuzzy
+
+	// Gate 1 (crisp): Casual hedging suppression — still binary override.
+	if finding.GetFindingType() == reasoningv1.FindingType_CONFIDENCE_MISCALIBRATION {
+		if formality < cfg.FormalityThreshold {
+			triggerText := extractTriggerText(finding, snap)
+			if containsCasualHedge(triggerText, cfg.CasualHedgeWords) {
+				return makeDecision(fid, cerebrov1.InhibitionAction_INHIBITED,
+					"casual_hedge_in_informal_context", 0, finding), finding
+			}
+		}
+	}
+
+	// Gate 2 (crisp): Severity auto-pass — CRITICAL always disinhibits.
+	if finding.GetSeverity() == reasoningv1.FindingSeverity_CRITICAL {
+		return makeDecision(fid, cerebrov1.InhibitionAction_DISINHIBITED,
+			"severity_auto_pass", 0, finding), finding
+	}
+
+	// Fuzzy gates: evaluate each FIS and collect inhibition strengths.
+	var maxInhibition float64
+	var maxReason string
+
+	// Formality gate: how much should informal context suppress findings?
+	if fz.FormalityEngine != nil {
+		outputs, err := fz.FormalityEngine.Evaluate(map[string]float64{
+			"formality": formality,
+		})
+		if err == nil {
+			if inh, ok := outputs["inhibition_strength"]; ok && inh > maxInhibition {
+				maxInhibition = inh
+				maxReason = "fuzzy_formality_gate"
+			}
+		}
+	}
+
+	// Severity gate: stakes-based suppression (replaces crisp gates 3).
+	// Map proto severity ordinal to FIS range [0, 3].
+	// INFO=1→0.75, CAUTION=2→1.5, WARNING=3→2.25, CRITICAL=4→3.0 (won't reach here).
+	if fz.SeverityEngine != nil {
+		sevOrd := float64(finding.GetSeverity()) * 0.75
+		outputs, err := fz.SeverityEngine.Evaluate(map[string]float64{
+			"severity": sevOrd,
+			"urgency":  urgency,
+		})
+		if err == nil {
+			if inh, ok := outputs["inhibition_strength"]; ok && inh > maxInhibition {
+				maxInhibition = inh
+				maxReason = "fuzzy_severity_gate"
+			}
+		}
+	}
+
+	// Evidence gate: confidence + corroboration (replaces crisp gates 4 and 5).
+	corr := computeCorroboration(finding, activeDetectors, turnFindings, cfg.ProximityWindowTurns)
+	if fz.EvidenceEngine != nil {
+		outputs, err := fz.EvidenceEngine.Evaluate(map[string]float64{
+			"confidence":    finding.GetConfidence(),
+			"corroboration": corr,
+		})
+		if err == nil {
+			if inh, ok := outputs["inhibition_strength"]; ok && inh > maxInhibition {
+				maxInhibition = inh
+				maxReason = "fuzzy_evidence_gate"
+			}
+		}
+	}
+
+	// Apply multiplicative suppression: confidence × (1 - inhibition_strength).
+	// Inhibition > 0.8 → INHIBITED (full block with suppressed confidence).
+	// Inhibition <= 0.8 → DISINHIBITED (passes with reduced confidence).
+	suppressedConf := finding.GetConfidence() * (1.0 - maxInhibition)
+
+	// Create suppressed copy of the assessment (don't mutate original).
+	suppressed := cloneAssessment(finding)
+	suppressed.Confidence = suppressedConf
+
+	if maxInhibition > 0.8 {
+		return makeDecision(fid, cerebrov1.InhibitionAction_INHIBITED,
+			maxReason, corr, finding), suppressed
+	}
+
+	if maxReason == "" {
+		maxReason = "all_gates_passed"
+	}
+	return makeDecision(fid, cerebrov1.InhibitionAction_DISINHIBITED,
+		maxReason, corr, finding), suppressed
+}
+
+// cloneAssessment creates a deep copy of a CognitiveAssessment via protobuf Clone.
+func cloneAssessment(a *reasoningv1.CognitiveAssessment) *reasoningv1.CognitiveAssessment {
+	return proto.Clone(a).(*reasoningv1.CognitiveAssessment)
 }
 
 func computeCorroboration(

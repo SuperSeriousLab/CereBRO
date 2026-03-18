@@ -1,0 +1,148 @@
+{
+  "name": "l3_evidence_gate",
+  "defuzz_method": "centroid",
+  "centroid_resolution": 200,
+  "input_variables": [
+    {
+      "name": "confidence",
+      "min": 0.0,
+      "max": 1.0,
+      "terms": [
+        {
+          "name": "low",
+          "Trapezoidal": { "a": 0.0, "b": 0.0, "c": 0.3, "d": 0.55 }
+        },
+        {
+          "name": "medium",
+          "Triangular": { "a": 0.35, "b": 0.55, "c": 0.75 }
+        },
+        {
+          "name": "high",
+          "Trapezoidal": { "a": 0.6, "b": 0.8, "c": 1.0, "d": 1.0 }
+        }
+      ]
+    },
+    {
+      "name": "corroboration",
+      "min": 0.0,
+      "max": 1.0,
+      "terms": [
+        {
+          "name": "none",
+          "Trapezoidal": { "a": 0.0, "b": 0.0, "c": 0.05, "d": 0.2 }
+        },
+        {
+          "name": "weak",
+          "Triangular": { "a": 0.05, "b": 0.25, "c": 0.5 }
+        },
+        {
+          "name": "strong",
+          "Trapezoidal": { "a": 0.3, "b": 0.6, "c": 1.0, "d": 1.0 }
+        }
+      ]
+    }
+  ],
+  "output_variables": [
+    {
+      "name": "inhibition_strength",
+      "min": 0.0,
+      "max": 1.0,
+      "terms": [
+        {
+          "name": "none",
+          "Trapezoidal": { "a": 0.0, "b": 0.0, "c": 0.05, "d": 0.15 }
+        },
+        {
+          "name": "weak",
+          "Triangular": { "a": 0.05, "b": 0.25, "c": 0.45 }
+        },
+        {
+          "name": "moderate",
+          "Triangular": { "a": 0.3, "b": 0.5, "c": 0.7 }
+        },
+        {
+          "name": "strong",
+          "Triangular": { "a": 0.55, "b": 0.75, "c": 0.95 }
+        },
+        {
+          "name": "full",
+          "Trapezoidal": { "a": 0.85, "b": 0.95, "c": 1.0, "d": 1.0 }
+        }
+      ]
+    }
+  ],
+  "rules": [
+    {
+      "conditions": [
+        { "variable": "confidence", "term": "low" },
+        { "variable": "corroboration", "term": "none" }
+      ],
+      "connector": "and",
+      "consequent": { "variable": "inhibition_strength", "term": "full" }
+    },
+    {
+      "conditions": [
+        { "variable": "confidence", "term": "low" },
+        { "variable": "corroboration", "term": "weak" }
+      ],
+      "connector": "and",
+      "consequent": { "variable": "inhibition_strength", "term": "strong" }
+    },
+    {
+      "conditions": [
+        { "variable": "confidence", "term": "low" },
+        { "variable": "corroboration", "term": "strong" }
+      ],
+      "connector": "and",
+      "consequent": { "variable": "inhibition_strength", "term": "moderate" }
+    },
+    {
+      "conditions": [
+        { "variable": "confidence", "term": "medium" },
+        { "variable": "corroboration", "term": "none" }
+      ],
+      "connector": "and",
+      "consequent": { "variable": "inhibition_strength", "term": "strong" }
+    },
+    {
+      "conditions": [
+        { "variable": "confidence", "term": "medium" },
+        { "variable": "corroboration", "term": "weak" }
+      ],
+      "connector": "and",
+      "consequent": { "variable": "inhibition_strength", "term": "moderate" }
+    },
+    {
+      "conditions": [
+        { "variable": "confidence", "term": "medium" },
+        { "variable": "corroboration", "term": "strong" }
+      ],
+      "connector": "and",
+      "consequent": { "variable": "inhibition_strength", "term": "weak" }
+    },
+    {
+      "conditions": [
+        { "variable": "confidence", "term": "high" },
+        { "variable": "corroboration", "term": "none" }
+      ],
+      "connector": "and",
+      "consequent": { "variable": "inhibition_strength", "term": "moderate" }
+    },
+    {
+      "conditions": [
+        { "variable": "confidence", "term": "high" },
+        { "variable": "corroboration", "term": "weak" }
+      ],
+      "connector": "and",
+      "consequent": { "variable": "inhibition_strength", "term": "weak" }
+    },
+    {
+      "conditions": [
+        { "variable": "confidence", "term": "high" },
+        { "variable": "corroboration", "term": "strong" }
+      ],
+      "connector": "and",
+      "consequent": { "variable": "inhibition_strength", "term": "none" }
+    }
+  ]
+}
