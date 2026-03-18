@@ -236,19 +236,31 @@ func (c *PTSClient) SendInject(ctx context.Context, text string) {
 
 // maybeInjectPTSFindings fires a goroutine for each finding with confidence >= InjectConfidenceThreshold,
 // POSTing the detection text to PTS /inject. It is a no-op when endpoint is empty. Never blocks.
-func maybeInjectPTSFindings(result *PipelineResult, endpoint string) {
-	if endpoint == "" || result == nil || result.Rejected {
+// When store is non-nil, each injected finding is also recorded in the outcome store for TP/FP tracking.
+func maybeInjectPTSFindings(result *PipelineResult, endpoint string, store ...*OutcomeStore) {
+	if result == nil || result.Rejected {
 		return
 	}
 	convID := ""
 	if result.Report != nil {
 		convID = result.Report.GetConversationId()
 	}
-	client := &PTSClient{
-		endpoint: endpoint,
-		timeout:  injectPTSTimeout,
-		http:     &http.Client{Timeout: injectPTSTimeout},
+
+	var outcomeStore *OutcomeStore
+	if len(store) > 0 {
+		outcomeStore = store[0]
 	}
+
+	var client *PTSClient
+	if endpoint != "" {
+		client = &PTSClient{
+			endpoint: endpoint,
+			timeout:  injectPTSTimeout,
+			http:     &http.Client{Timeout: injectPTSTimeout},
+		}
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
 	for _, f := range result.Findings {
 		if f.GetConfidence() < InjectConfidenceThreshold {
 			continue
@@ -257,12 +269,30 @@ func maybeInjectPTSFindings(result *PipelineResult, endpoint string) {
 		if cogName == "" {
 			cogName = findingTypeName(f.GetFindingType())
 		}
-		text := fmt.Sprintf(
-			"CereBRO COG signal: %s detected %s (conf=%.2f) in conversation %s",
-			cogName, findingTypeName(f.GetFindingType()), f.GetConfidence(), convID,
-		)
-		t := text // capture loop variable
-		go client.SendInject(context.Background(), t)
+
+		// PTS injection (fire-and-forget).
+		if client != nil {
+			text := fmt.Sprintf(
+				"CereBRO COG signal: %s detected %s (conf=%.2f) in conversation %s",
+				cogName, findingTypeName(f.GetFindingType()), f.GetConfidence(), convID,
+			)
+			t := text // capture loop variable
+			go client.SendInject(context.Background(), t)
+		}
+
+		// Outcome store recording (fire-and-forget, best-effort).
+		if outcomeStore != nil {
+			outcome := FindingOutcome{
+				ID:           newUUID(),
+				SessionID:    convID,
+				DetectorName: cogName,
+				FindingType:  findingTypeName(f.GetFindingType()),
+				Confidence:   f.GetConfidence(),
+				FiredAt:      now,
+			}
+			o := outcome // capture loop variable
+			go outcomeStore.Record(o)
+		}
 	}
 }
 

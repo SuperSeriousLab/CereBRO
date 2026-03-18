@@ -35,7 +35,8 @@ import (
 //
 // ptsEndpoint (optional) enables fire-and-forget PTS anomaly signals. Pass ""
 // to disable. Mirrors the PTSEndpoint field on PipelineConfig.
-func RunAdaptive(snap *reasoningv1.ConversationSnapshot, domain *DomainContext, ptsEndpoint string) (*PipelineResult, error) {
+// store (optional variadic) enables outcome recording for TP/FP tracking.
+func RunAdaptive(snap *reasoningv1.ConversationSnapshot, domain *DomainContext, ptsEndpoint string, store ...*OutcomeStore) (*PipelineResult, error) {
 	if snap == nil {
 		return nil, errors.New("RunAdaptive: snap must not be nil")
 	}
@@ -55,6 +56,11 @@ func RunAdaptive(snap *reasoningv1.ConversationSnapshot, domain *DomainContext, 
 
 	// Wire PTS endpoint for fire-and-forget anomaly signals.
 	cfg.PTSEndpoint = ptsEndpoint
+
+	// Wire outcome store for TP/FP tracking (optional).
+	if len(store) > 0 {
+		cfg.OutcomeStore = store[0]
+	}
 
 	result := Run(snap, cfg)
 	return result, nil

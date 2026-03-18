@@ -88,6 +88,12 @@ type PipelineConfig struct {
 	//   CouncilID      string — default: "tech-review"
 	//   TimeoutSeconds int    — default: 30
 	DorangDebate DorangArbitratorConfig
+
+	// CompoundPathology is the Tier 3 meta-COG aggregator.
+	// When non-nil, it runs after all Tier 1/2 COG findings are collected
+	// (Stage 5.5, after the CrossLayerArbitrator) and may emit a
+	// COMPOUND_PATHOLOGY finding when compound_risk > threshold (default 0.6).
+	CompoundPathology *CompoundPathologyAggregator
 }
 
 // DefaultPipelineConfig returns all-default detector configurations.
@@ -131,6 +137,7 @@ type PipelineResult struct {
 	ConsolidationTrigger cerebrov1.ConsolidationTrigger // what triggered consolidation
 	MLEnrichments []*cerebrov1.MLEnrichment       // nil if ML enricher not enabled
 	Arbitration   *ArbitrationResult              // nil if arbitrator not enabled
+	CompoundPathology *CompoundPathologyResult    // nil if Tier 3 aggregator not enabled
 }
 
 // Run executes the full cognitive pipeline on a ConversationSnapshot:
@@ -321,18 +328,30 @@ func Run(snap *reasoningv1.ConversationSnapshot, cfg PipelineConfig) *PipelineRe
 		arbitration = cfg.Arbitrator.Arbitrate(findings, inhibition)
 	}
 
+	// Stage 5.6: Tier 3 Compound Pathology Aggregator
+	// Runs after all Tier 1/2 COG findings are available.
+	// May emit a COMPOUND_PATHOLOGY finding appended to the raw findings slice.
+	var compoundPathologyResult *CompoundPathologyResult
+	if cfg.CompoundPathology != nil {
+		compoundPathologyResult = cfg.CompoundPathology.Aggregate(findings)
+		if compoundPathologyResult.Finding != nil {
+			findings = append(findings, compoundPathologyResult.Finding)
+		}
+	}
+
 	result := &PipelineResult{
-		Report:        report,
-		Routing:       routing,
-		Findings:      findings, // all raw findings (pre-inhibition)
-		Inhibition:    inhibition,
-		Gain:          gain,
-		Adjustments:   adjustments,
-		SelfConf:      selfConf,
-		Feedback:      feedbackResult,
-		Salience:      salienceResult,
-		MLEnrichments: mlEnrichments,
-		Arbitration:   arbitration,
+		Report:            report,
+		Routing:           routing,
+		Findings:          findings, // all raw findings (pre-inhibition) + any COMPOUND_PATHOLOGY
+		Inhibition:        inhibition,
+		Gain:              gain,
+		Adjustments:       adjustments,
+		SelfConf:          selfConf,
+		Feedback:          feedbackResult,
+		Salience:          salienceResult,
+		MLEnrichments:     mlEnrichments,
+		Arbitration:       arbitration,
+		CompoundPathology: compoundPathologyResult,
 	}
 
 	// Stage 8: Memory Consolidator (Phase 5)

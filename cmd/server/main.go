@@ -2,13 +2,16 @@
 //
 // Endpoints:
 //
-//	POST /analyze    — Run the adaptive pipeline on a ConversationSnapshot
-//	GET  /health     — Health check
-//	GET  /info       — Pipeline variant and configuration info
+//	POST /analyze                   — Run the adaptive pipeline on a ConversationSnapshot
+//	GET  /health                    — Health check
+//	GET  /info                      — Pipeline variant and configuration info
+//	POST /findings/{id}/outcome     — Validate a finding (TP or FP)
+//	GET  /findings?detector=X&limit=20 — List recent findings with outcome status
+//	GET  /metrics/detectors         — Per-detector TP/FP precision metrics
 //
 // Usage:
 //
-//	cerebro-server --addr :8070 [--sophrim http://192.168.14.65:8090]
+//	cerebro-server --addr :8070 [--sophrim http://192.168.14.65:8090] [--outcomes /var/lib/cerebro/outcomes.ndjson]
 package main
 
 import (
@@ -46,6 +49,7 @@ func main() {
 	addr := flag.String("addr", ":8070", "listen address")
 	sophrimURL := flag.String("sophrim", sophrimEndpointDefault(), "Sophrim endpoint for domain context")
 	ptsURL := flag.String("pts", ptsEndpointDefault(), "PTS endpoint for anomaly signals")
+	outcomesPath := flag.String("outcomes", pipeline.DefaultOutcomesPath, "Path to NDJSON outcomes file")
 	flag.Parse()
 
 	startTime = time.Now()
@@ -55,10 +59,16 @@ func main() {
 		sophrimClient = pipeline.NewSophrimClient(*sophrimURL, sophrimTimeout)
 	}
 
+	store := pipeline.NewOutcomeStore(*outcomesPath)
+	log.Printf("cerebro-server: outcome store at %s", *outcomesPath)
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler)
 	mux.HandleFunc("/info", infoHandler)
-	mux.HandleFunc("/analyze", analyzeHandler(sophrimClient, *ptsURL))
+	mux.HandleFunc("/analyze", analyzeHandler(sophrimClient, *ptsURL, store))
+	mux.HandleFunc("/findings", findingsHandler(store))
+	mux.HandleFunc("/findings/", findingOutcomeHandler(store))
+	mux.HandleFunc("/metrics/detectors", detectorMetricsHandler(store))
 
 	srv := &http.Server{
 		Addr:         *addr,
@@ -143,7 +153,7 @@ type analyzeResponse struct {
 	Report json.RawMessage `json:"report,omitempty"`
 }
 
-func analyzeHandler(sophrimClient *pipeline.SophrimClient, ptsEndpoint string) http.HandlerFunc {
+func analyzeHandler(sophrimClient *pipeline.SophrimClient, ptsEndpoint string, store *pipeline.OutcomeStore) http.HandlerFunc {
 	pjUnmarshaler := protojson.UnmarshalOptions{DiscardUnknown: true}
 	pjMarshaler := protojson.MarshalOptions{EmitUnpopulated: false}
 
@@ -192,7 +202,7 @@ func analyzeHandler(sophrimClient *pipeline.SophrimClient, ptsEndpoint string) h
 		}
 
 		start := time.Now()
-		result, err := pipeline.RunAdaptive(&snap, domain, ptsEndpoint)
+		result, err := pipeline.RunAdaptive(&snap, domain, ptsEndpoint, store)
 		elapsed := time.Since(start)
 
 		if err != nil {
@@ -292,4 +302,116 @@ func init() {
 	if v := os.Getenv("CEREBRO_VERSION"); v != "" {
 		version = v
 	}
+}
+
+// ── Outcome / metrics endpoints ──────────────────────────────────────────────
+
+// outcomeRequest is the payload for POST /findings/{id}/outcome.
+type outcomeRequest struct {
+	Correct bool   `json:"correct"` // true = TP, false = FP
+	Notes   string `json:"notes"`   // optional human annotation
+}
+
+// findingsHandler handles GET /findings?detector=X&limit=N.
+func findingsHandler(store *pipeline.OutcomeStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+			return
+		}
+		detector := r.URL.Query().Get("detector")
+		limit := 20
+		if lStr := r.URL.Query().Get("limit"); lStr != "" {
+			if n := parseInt(lStr); n > 0 {
+				limit = n
+			}
+		}
+		findings, err := store.List(detector, limit)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		if findings == nil {
+			findings = []pipeline.FindingOutcome{}
+		}
+		writeJSON(w, http.StatusOK, findings)
+	}
+}
+
+// findingOutcomeHandler handles POST /findings/{id}/outcome.
+// URL pattern: /findings/<id>/outcome
+func findingOutcomeHandler(store *pipeline.OutcomeStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Expect path: /findings/{id}/outcome
+		path := strings.TrimPrefix(r.URL.Path, "/findings/")
+		path = strings.TrimSuffix(path, "/outcome")
+		id := strings.TrimSpace(path)
+
+		if id == "" || !strings.HasSuffix(r.URL.Path, "/outcome") {
+			// Not an outcome path — treat as list endpoint redirect.
+			findingsHandler(store)(w, r)
+			return
+		}
+
+		if r.Method != http.MethodPost {
+			http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+			return
+		}
+
+		r.Body = http.MaxBytesReader(w, r.Body, 64*1024)
+		var req outcomeRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON: " + err.Error()})
+			return
+		}
+
+		if err := store.Validate(id, req.Correct, req.Notes); err != nil {
+			if strings.Contains(err.Error(), "not found") {
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
+			} else {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			}
+			return
+		}
+
+		finding, err := store.GetByID(id)
+		if err != nil {
+			writeJSON(w, http.StatusOK, map[string]string{"status": "validated"})
+			return
+		}
+		writeJSON(w, http.StatusOK, finding)
+	}
+}
+
+// detectorMetricsHandler handles GET /metrics/detectors.
+func detectorMetricsHandler(store *pipeline.OutcomeStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+			return
+		}
+		metrics, err := store.Metrics()
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		if metrics == nil {
+			metrics = []pipeline.DetectorMetrics{}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"detectors": metrics,
+		})
+	}
+}
+
+// parseInt parses a decimal string. Returns 0 on failure.
+func parseInt(s string) int {
+	n := 0
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return 0
+		}
+		n = n*10 + int(c-'0')
+	}
+	return n
 }
