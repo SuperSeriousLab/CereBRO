@@ -1,0 +1,7 @@
+{
+  "entry_id": "modern-contradiction-01-038",
+  "finding_type": "CONTRADICTION",
+  "confidence": 0.75,
+  "explanation": "Contradictory statements detected from the same speaker across turns",
+  "conversation_text": "Hey B, so about that sprint retrospective from last week. I think we should start. What went well for you? Uh, yeah, sure. For me, the daily standups were great. They kept everyone on track without taking too much time. What about you? Totally agree on standups. They were super efficient. But, man, the code reviews... they dragged on forever. We need to cut that down. Code reviews? I thought they were okay. Yeah, sometimes slow, but they caught that big bug in the payment module. Remember? Without them, we'd be screwed. True, that bug was nasty. But still, too much time spent. Hey, tangent—did you see the new coffee machine in the kitchen? Way better than the old sludge."
+}

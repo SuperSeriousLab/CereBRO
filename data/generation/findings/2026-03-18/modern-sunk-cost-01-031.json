@@ -1,0 +1,14 @@
+{
+  "entry_id": "modern-sunk-cost-01-031",
+  "findings": [
+    {
+      "type": "CONTRADICTION",
+      "confidence": 0.75,
+      "severity": "WARNING",
+      "turns": [
+        3,
+        9
+      ]
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "entry_id": "modern-scope-drift-01-014",
+  "finding_type": "SCOPE_DRIFT",
+  "confidence": 0.9526627218934911,
+  "explanation": "Conversation topics have drifted from the stated objective",
+  "conversation_text": "Hey B, so we're finally doing that database migration from MySQL to PostgreSQL, right? I've been reading up on it, and it seems straightforward with pg_dump or something, but I wanted to bounce some ideas off you before we dive in. Yeah, A, definitely. Our MySQL setup is getting creaky with all the scaling issues. pg_dump should work for the initial dump, but what about the schema differences? Like, MySQL's loose typing versus Postgres's strictness—might bite us on enums or whatever. Umm, good point. I was thinking of using a tool like Flyway or Liquibase to handle the schema migrations incrementally. That way we avoid a big bang cutover. Have you used those before? Liquibase, yeah, a bit. It's solid for versioning changes. But honestly, with our app's traffic, maybe we should look at zero-downtime migration strategies. Like, dual-writing to both DBs for a while? Kinda like how Netflix does it... or at least I think they do. Dual-writing sounds smart, but that means updating all our repo code to handle both. Our services are mostly in Go, so not too bad, but the ORM—GORM—does it support Postgres out of the box? Oh, and wait, are we even consistent with connection pooling across services?"
+}

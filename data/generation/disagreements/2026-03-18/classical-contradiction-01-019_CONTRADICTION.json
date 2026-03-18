@@ -1,0 +1,9 @@
+{
+  "entry_id": "classical-contradiction-01-019",
+  "finding_type": "CONTRADICTION",
+  "confidence": 0.8,
+  "explanation": "Contradictory statements detected from the same speaker across turns",
+  "conversation_text": "Hey, I was reading this thing online about how recycling doesn't actually help the environment much. Like, all that plastic we sort just ends up in landfills anyway because it's not economically viable to process it. We should probably just stop pretending it's making a difference. Whoa, really? I've always thought recycling was super important. I mean, we do curbside pickup every week, and it feels like we're doing something good. Where'd you read that? Uh, some article on, I dunno, maybe it was Vox or something. Point is, the system's broken. Only like 9% of plastic gets recycled for real. The rest is buried or burned. So why bother sorting our trash? Hmm, okay, but isn't that because people don't recycle properly? Like, if we all did it right, wouldn't it work better? And what about paper and cans? Those seem to get reused a lot. Yeah, paper maybe, but even then, it's energy-intensive to process. Look, the core issue is we're producing too much waste in the first place. Recycling's just a band-aid that lets companies keep making single-use crap without guilt. Real change is reducing consumption.",
+  "grok_verdict": "DISAGREE",
+  "grok_reason": "DISAGREE - The conversation does not exhibit contradiction as the speakers are presenting different viewpoints and arguments, not contradicting themselves."
+}

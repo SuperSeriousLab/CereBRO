@@ -1,0 +1,22 @@
+{
+  "entry_id": "classical-knowledge-01-033",
+  "findings": [
+    {
+      "type": "CONTRADICTION",
+      "confidence": 0.77,
+      "severity": "WARNING",
+      "turns": [
+        1,
+        5
+      ]
+    },
+    {
+      "type": "SCOPE_DRIFT",
+      "confidence": 0.8059701492537313,
+      "severity": "CAUTION",
+      "turns": [
+        15
+      ]
+    }
+  ]
+}

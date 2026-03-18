@@ -1,0 +1,22 @@
+{
+  "entry_id": "classical-state-01-029",
+  "findings": [
+    {
+      "type": "CONTRADICTION",
+      "confidence": 0.75,
+      "severity": "WARNING",
+      "turns": [
+        1,
+        5
+      ]
+    },
+    {
+      "type": "SCOPE_DRIFT",
+      "confidence": 0.9105263157894736,
+      "severity": "WARNING",
+      "turns": [
+        15
+      ]
+    }
+  ]
+}

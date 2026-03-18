@@ -1,0 +1,14 @@
+{
+  "entry_id": "classical-contradiction-01-019",
+  "findings": [
+    {
+      "type": "CONTRADICTION",
+      "confidence": 0.8,
+      "severity": "CRITICAL",
+      "turns": [
+        1,
+        9
+      ]
+    }
+  ]
+}

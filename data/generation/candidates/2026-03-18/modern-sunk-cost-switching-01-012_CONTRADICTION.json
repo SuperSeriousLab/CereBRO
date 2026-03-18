@@ -1,0 +1,7 @@
+{
+  "entry_id": "modern-sunk-cost-switching-01-012",
+  "finding_type": "CONTRADICTION",
+  "confidence": 0.75,
+  "explanation": "Contradictory statements detected from the same speaker across turns",
+  "conversation_text": "Hey Sarah, I was looking at our CRM system the other day. You know how we've been complaining about the slow reports and all the glitches? I found this other tool, Zoho CRM. It's way cheaper, integrates better with our accounting software, and the reviews say it's faster. Should we switch? Oh yeah, Mike? I've heard of Zoho. Let me think... We've been on Salesforce for like four years now, right? Um, what makes you say it's better? Well, for starters, Salesforce costs us $15k a year per team, and Zoho is half that. Plus, their dashboard is intuitive—no more digging through menus. I even did a quick trial; reports generate in seconds, not minutes. And get this, it has built-in AI for lead scoring that Salesforce charges extra for. Hmm, sounds good on paper. But... have you thought about the migration? Remember when we switched email providers two years ago? It took weeks, and half our data got messed up. Salesforce has all our customer history baked in. True, migration could be a pain, but Zoho has import tools and they offer free support for it. I saw case studies where companies our size switched in a weekend. And long-term, we'd save so much money."
+}

@@ -1,0 +1,7 @@
+{
+  "entry_id": "modern-contradiction-interview-01-036",
+  "finding_type": "CONTRADICTION",
+  "confidence": 0.75,
+  "explanation": "Contradictory statements detected from the same speaker across turns",
+  "conversation_text": "Hi, thanks for coming in today. I'm Alex, the hiring manager for the Senior Software Engineer position. Please, have a seat. Can you start by telling me a bit about yourself and your relevant experience? Uh, sure, hi Alex. I'm Jordan, nice to meet you. So, I've been in software development for about eight years now, mostly full-stack work with React and Node.js. Last role at TechNova, I led a team building a customer dashboard that handled, like, millions of data points daily. Really proud of that. That sounds impressive. TechNova—can you remind me how long you were there and what your exact role was? Yeah, I was there for four years, from 2019 to 2023. Senior Full-Stack Developer, reporting directly to the CTO. We scaled the app from scratch, integrated AWS services, the whole nine yards. Great. On your resume, you mentioned leading that dashboard project. Walk me through the tech stack and any challenges you faced."
+}

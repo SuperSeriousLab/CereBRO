@@ -1,0 +1,24 @@
+{
+  "entry_id": "modern-contradiction-01-018",
+  "findings": [
+    {
+      "type": "CONTRADICTION",
+      "confidence": 0.75,
+      "severity": "WARNING",
+      "turns": [
+        5,
+        7
+      ]
+    },
+    {
+      "type": "SCOPE_DRIFT",
+      "confidence": 0.9278350515463918,
+      "severity": "WARNING",
+      "turns": [
+        14,
+        15,
+        16
+      ]
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "entry_id": "classical-drift-01-010",
+  "findings": [
+    {
+      "type": "CONTRADICTION",
+      "confidence": 0.8,
+      "severity": "CRITICAL",
+      "turns": [
+        3,
+        7
+      ]
+    },
+    {
+      "type": "SCOPE_DRIFT",
+      "confidence": 0.8909090909090909,
+      "severity": "WARNING",
+      "turns": [
+        15
+      ]
+    }
+  ]
+}

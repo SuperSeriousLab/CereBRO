@@ -1,0 +1,23 @@
+{
+  "entry_id": "classical-inherited-01-035",
+  "findings": [
+    {
+      "type": "CONTRADICTION",
+      "confidence": 0.7833333333333333,
+      "severity": "WARNING",
+      "turns": [
+        1,
+        5
+      ]
+    },
+    {
+      "type": "SCOPE_DRIFT",
+      "confidence": 0.8790322580645161,
+      "severity": "WARNING",
+      "turns": [
+        14,
+        15
+      ]
+    }
+  ]
+}

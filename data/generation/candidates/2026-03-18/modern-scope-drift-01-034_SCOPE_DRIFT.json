@@ -1,0 +1,7 @@
+{
+  "entry_id": "modern-scope-drift-01-034",
+  "finding_type": "SCOPE_DRIFT",
+  "confidence": 0.9207317073170732,
+  "explanation": "Conversation topics have drifted from the stated objective",
+  "conversation_text": "Hey B, so we're finally doing this database migration from MySQL to PostgreSQL, right? I've been reading up on it, but man, it's kinda scary with all our production data. Yeah, A, totally. I've done a couple migrations before, but nothing this big. What's your main worry? Downtime? Data integrity? Both, honestly. Like, how do we even test this without breaking everything? I was thinking maybe set up a replica first or something... uh, you know, like logical replication? Smart. Yeah, MySQL has binary logs, we can stream changes to Postgres. But wait, our schema has those weird custom types in the user table—remember the JSON blobs for preferences? Postgres handles JSON better anyway, but we gotta map 'em right. Oh yeah, those. Haha, they were a hack because MySQL JSON was meh. Okay, so pg_dump or what? No, for migration, maybe something like... Flyway or Liquibase for the schema diffs?"
+}

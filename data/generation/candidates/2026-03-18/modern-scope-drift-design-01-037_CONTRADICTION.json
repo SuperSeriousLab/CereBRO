@@ -1,0 +1,7 @@
+{
+  "entry_id": "modern-scope-drift-design-01-037",
+  "finding_type": "CONTRADICTION",
+  "confidence": 0.75,
+  "explanation": "Contradictory statements detected from the same speaker across turns",
+  "conversation_text": "Hey B, so I was thinking about that login button we talked about last week. You know, the one on the dashboard? I feel like the hover effect is kinda off—it's too subtle, right? Like, users might not even notice it. Yeah, uh, the login button. Hmm, I see what you mean. It's got that light blue glow now, but maybe we crank up the opacity? Or add a shadow? What do you think caused it to feel subtle? Exactly, shadow might help. But wait, speaking of shadows, I was messing with the CSS for the nav bar earlier, and it got me thinking about the whole sidebar menu. It's drifting too—remember how it overlaps on mobile? That's been bugging me since the last sprint. Oh man, the sidebar. Yeah, that's a pain. We used flexbox for that, but on iPhone it pushes the content off-screen. Should we switch to grid or just media queries? Uh, but back to the button for a sec—did you test it with color-blind users? Color-blind? Not yet, good call. But the sidebar... yeah, grid might be overkill. Hey, that reminds me—while I was on mobile, I noticed the chat widget in the bottom right is completely broken on Android. It doesn't even pop up half the time. Have you seen that?"
+}

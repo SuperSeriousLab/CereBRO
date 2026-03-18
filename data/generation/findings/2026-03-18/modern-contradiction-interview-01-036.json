@@ -1,0 +1,22 @@
+{
+  "entry_id": "modern-contradiction-interview-01-036",
+  "findings": [
+    {
+      "type": "CONTRADICTION",
+      "confidence": 0.75,
+      "severity": "WARNING",
+      "turns": [
+        5,
+        7
+      ]
+    },
+    {
+      "type": "SCOPE_DRIFT",
+      "confidence": 0.8944099378881988,
+      "severity": "WARNING",
+      "turns": [
+        15
+      ]
+    }
+  ]
+}

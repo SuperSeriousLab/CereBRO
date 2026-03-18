@@ -1,0 +1,14 @@
+{
+  "entry_id": "modern-scope-drift-design-01-037",
+  "findings": [
+    {
+      "type": "CONTRADICTION",
+      "confidence": 0.75,
+      "severity": "WARNING",
+      "turns": [
+        1,
+        9
+      ]
+    }
+  ]
+}

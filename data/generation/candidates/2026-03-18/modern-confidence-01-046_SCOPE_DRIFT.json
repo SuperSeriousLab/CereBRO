@@ -1,0 +1,7 @@
+{
+  "entry_id": "modern-confidence-01-046",
+  "finding_type": "SCOPE_DRIFT",
+  "confidence": 0.9279279279279279,
+  "explanation": "Conversation topics have drifted from the stated objective",
+  "conversation_text": "Hey B, you watching the stock market lately? Tesla's gonna explode upwards next quarter, mark my words. Easy 50% gain. Whoa, really? That's bold. What makes you say that? They've been kinda volatile. Nah, trust me. Elon just tweeted something about full self-driving being ready soon. And, uh, their sales numbers were good last time, right? It's obvious. I saw the tweet, but didn't they miss earnings estimates a couple months back? And competition from China is heating up. Pfft, earnings? That's old news. Elon's a genius, he always pulls it off. Remember 2020? Stock went nuts. Same thing's happening. Buy now or regret it."
+}

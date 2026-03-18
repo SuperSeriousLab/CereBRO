@@ -1,0 +1,7 @@
+{
+  "entry_id": "classical-drift-01-050",
+  "finding_type": "CONTRADICTION",
+  "confidence": 0.8,
+  "explanation": "Contradictory statements detected from the same speaker across turns",
+  "conversation_text": "Hey B, I was reading this philosophy thing earlier about courage. Like, what even is it? Is it just not being scared, or something deeper? Uh, courage? Yeah, I guess... like running into a burning building to save someone? But man, that sounds terrifying. I don't know if I'd do that. Exactly! So it's not absence of fear, right? Aristotle or someone said it's about facing fear for a noble reason. But... what counts as noble? Hmm. Noble, yeah. Like soldiers in war? But wars are messy. Sometimes it's just stupid bravery, you know? Like jumping off a cliff on a dare. That's not courage, that's dumb. Haha, true, tangent there. But okay, so courage involves pain, right? Facing potential pain or death. You're choosing the scary path over the safe, comfy one."
+}

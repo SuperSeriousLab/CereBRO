@@ -1,0 +1,7 @@
+{
+  "entry_id": "modern-contradiction-interview-01-016",
+  "finding_type": "CONTRADICTION",
+  "confidence": 0.8,
+  "explanation": "Contradictory statements detected from the same speaker across turns",
+  "conversation_text": "Hi, thanks for coming in today. I'm Alex, the hiring manager for the Senior Software Engineer position. Have a seat. So, tell me a bit about yourself and why you're interested in this role at TechNova. Hey Alex, thanks for having me. Um, yeah, I'm Jordan, and I've been in software dev for about eight years now, mostly full-stack work with React and Node.js. I saw the posting and love what TechNova's doing with scalable cloud apps—I've got experience there too, so it seems like a great fit. Great to hear. Eight years is solid. Walk me through your most recent role. What were your main responsibilities at your last company? Sure, so at my last gig with DataForge, I was leading a team of five devs on our flagship e-commerce platform. We built out microservices architecture from scratch, handling like millions of transactions a day. I was hands-on with the AWS deployments too. Impressive. And how long were you there? Your resume says two years—did you handle any DevOps specifically, like CI/CD pipelines?"
+}

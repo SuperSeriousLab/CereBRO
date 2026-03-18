@@ -1,0 +1,7 @@
+{
+  "entry_id": "modern-sunk-cost-01-031",
+  "finding_type": "CONTRADICTION",
+  "confidence": 0.75,
+  "explanation": "Contradictory statements detected from the same speaker across turns",
+  "conversation_text": "Hey B, so uh, about the Horizon app project... we've poured like, what, 2.5 million into it already, right? I mean, we're seeing the user numbers tanking, but... shouldn't we just keep going? Sunk cost, you know? Yeah, Alex, I've seen the latest metrics. It's rough. But 2.5 million? That's exactly why we should reconsider. Throwing good money after bad feels like... I don't know, digging a deeper hole. But come on, think about it. We've already built the core engine, the UI is polished... if we pull out now, that's 2.5 million down the drain. Totally. What do we even tell the board? 'We quit because it got hard'? I get that, it's frustrating. Remember last quarter when we pivoted on the ad model? That cost us extra, but... wait, no, that's not helping. Look, sunk cost fallacy, right? We've talked about this in training. Just because we've spent it doesn't mean we spend more. Fallacy, shmallacy. Haha, okay, but seriously, uh... our competitors are still in this space. If we bail, someone else scoops it up. And we've got the team here, idle if we stop. That's another cost, layoffs or whatever."
+}

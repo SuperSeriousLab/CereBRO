@@ -1,0 +1,22 @@
+{
+  "entry_id": "modern-anchoring-01-022",
+  "findings": [
+    {
+      "type": "CONTRADICTION",
+      "confidence": 0.75,
+      "severity": "WARNING",
+      "turns": [
+        2,
+        8
+      ]
+    },
+    {
+      "type": "SCOPE_DRIFT",
+      "confidence": 0.9079754601226994,
+      "severity": "WARNING",
+      "turns": [
+        15
+      ]
+    }
+  ]
+}

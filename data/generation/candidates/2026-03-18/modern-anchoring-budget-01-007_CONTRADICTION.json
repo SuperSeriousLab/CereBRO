@@ -1,0 +1,7 @@
+{
+  "entry_id": "modern-anchoring-budget-01-007",
+  "finding_type": "CONTRADICTION",
+  "confidence": 0.75,
+  "explanation": "Contradictory statements detected from the same speaker across turns",
+  "conversation_text": "Hey B, so I was looking at our budget review like you asked. Last year we spent $50k on marketing, right? Feels like we should just stick close to that for this year too. What do you think? Yeah, uh, $50k sounds familiar. But didn't we get like, way more leads this year already? Maybe bump it up a bit? I mean, anchoring to last year makes sense, but... True, leads are up, but last year that $50k got us to 500 leads. If we do the same again, probably similar results. No need to overthink it. Hey, speaking of leads, remember that one client who bailed? Total waste. Haha, yeah, the widget guy. Painful. Okay, fine, $50k for marketing. What about salaries? Last year total was $300k for the team. We hired two more people though. Two more? Yeah, but their salaries are about the same as the ones they replaced, kinda. Last year $300k covered 10 people, now 12 but whatever, let's say $360k? No, wait, anchor to $300k and add 20% or something. Eh, $350k sounds right."
+}

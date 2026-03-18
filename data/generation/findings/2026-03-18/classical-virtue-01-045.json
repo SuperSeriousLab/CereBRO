@@ -1,0 +1,22 @@
+{
+  "entry_id": "classical-virtue-01-045",
+  "findings": [
+    {
+      "type": "CONTRADICTION",
+      "confidence": 0.8,
+      "severity": "CRITICAL",
+      "turns": [
+        1,
+        7
+      ]
+    },
+    {
+      "type": "SCOPE_DRIFT",
+      "confidence": 0.8421052631578947,
+      "severity": "CAUTION",
+      "turns": [
+        15
+      ]
+    }
+  ]
+}

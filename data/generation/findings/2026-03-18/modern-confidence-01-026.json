@@ -1,0 +1,14 @@
+{
+  "entry_id": "modern-confidence-01-026",
+  "findings": [
+    {
+      "type": "SCOPE_DRIFT",
+      "confidence": 0.9512195121951219,
+      "severity": "CRITICAL",
+      "turns": [
+        14,
+        15
+      ]
+    }
+  ]
+}

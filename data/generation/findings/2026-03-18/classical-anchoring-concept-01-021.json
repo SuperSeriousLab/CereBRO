@@ -1,0 +1,22 @@
+{
+  "entry_id": "classical-anchoring-concept-01-021",
+  "findings": [
+    {
+      "type": "CONTRADICTION",
+      "confidence": 0.75,
+      "severity": "WARNING",
+      "turns": [
+        2,
+        10
+      ]
+    },
+    {
+      "type": "SCOPE_DRIFT",
+      "confidence": 0.9389312977099237,
+      "severity": "WARNING",
+      "turns": [
+        14
+      ]
+    }
+  ]
+}

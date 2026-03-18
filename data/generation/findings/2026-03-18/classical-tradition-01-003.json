@@ -1,0 +1,14 @@
+{
+  "entry_id": "classical-tradition-01-003",
+  "findings": [
+    {
+      "type": "CONTRADICTION",
+      "confidence": 0.75,
+      "severity": "WARNING",
+      "turns": [
+        4,
+        10
+      ]
+    }
+  ]
+}

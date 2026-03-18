@@ -1,0 +1,23 @@
+{
+  "entry_id": "modern-anchoring-budget-01-007",
+  "findings": [
+    {
+      "type": "ANCHORING_BIAS",
+      "confidence": 0.6111111111111112,
+      "severity": "WARNING",
+      "turns": [
+        1,
+        4
+      ]
+    },
+    {
+      "type": "CONTRADICTION",
+      "confidence": 0.75,
+      "severity": "WARNING",
+      "turns": [
+        3,
+        5
+      ]
+    }
+  ]
+}

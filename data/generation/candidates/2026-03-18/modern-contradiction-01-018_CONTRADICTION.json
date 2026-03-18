@@ -1,0 +1,7 @@
+{
+  "entry_id": "modern-contradiction-01-018",
+  "finding_type": "CONTRADICTION",
+  "confidence": 0.75,
+  "explanation": "Contradictory statements detected from the same speaker across turns",
+  "conversation_text": "Hey B, good sprint retrospective today? We crushed that feature rollout, right? I mean, the client loved it. Uh, yeah, sorta. But man, those bugs at the end... We spent half the sprint firefighting. What'd you think? Totally agree on the bugs. That's why I pushed so hard for more QA time upfront. Remember? I said from day one we needed dedicated testing cycles instead of squeezing it in. Wait, you did? I thought you were all about 'move fast and break things.' Like, last retro you were complaining QA slowed us down. Nah, I mean... yeah, I get why it felt that way, but I was talking about inefficient QA, not cutting it out. Anyway, this time it bit us hard."
+}

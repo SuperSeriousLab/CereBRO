@@ -1,0 +1,32 @@
+{
+  "entry_id": "classical-justice-01-020",
+  "findings": [
+    {
+      "type": "CONFIDENCE_MISCALIBRATION",
+      "confidence": 0.6666666666666666,
+      "severity": "CRITICAL",
+      "turns": [
+        14
+      ]
+    },
+    {
+      "type": "CONTRADICTION",
+      "confidence": 0.95,
+      "severity": "CRITICAL",
+      "turns": [
+        2,
+        12
+      ]
+    },
+    {
+      "type": "SCOPE_DRIFT",
+      "confidence": 0.9173553719008265,
+      "severity": "WARNING",
+      "turns": [
+        14,
+        15,
+        16
+      ]
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "entry_id": "classical-tradition-01-043",
+  "findings": [
+    {
+      "type": "CONTRADICTION",
+      "confidence": 0.75,
+      "severity": "WARNING",
+      "turns": [
+        2,
+        6
+      ]
+    },
+    {
+      "type": "SCOPE_DRIFT",
+      "confidence": 0.9172932330827068,
+      "severity": "WARNING",
+      "turns": [
+        14
+      ]
+    }
+  ]
+}

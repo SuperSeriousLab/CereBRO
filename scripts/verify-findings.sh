@@ -3,7 +3,7 @@ set -euo pipefail
 
 CEREBRO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 DATE=${1:-$(date +%Y-%m-%d)}
-FINDINGS_DIR="$CEREBRO_DIR/data/generation/findings/$DATE"
+FINDINGS_DIR="$CEREBRO_DIR/data/generation/candidates/$DATE"
 VERIFIED_DIR="$CEREBRO_DIR/data/generation/verified/$DATE"
 DISAGREED_DIR="$CEREBRO_DIR/data/generation/disagreements/$DATE"
 UNCERTAIN_DIR="$CEREBRO_DIR/data/generation/uncertain/$DATE"
@@ -24,9 +24,9 @@ for finding in "$FINDINGS_DIR"/*.json; do
     BASENAME=$(basename "$finding")
 
     # Skip already-processed findings
-    [[ -f "$VERIFIED_DIR/$BASENAME" ]] && { ((VERIFIED++)); continue; }
-    [[ -f "$DISAGREED_DIR/$BASENAME" ]] && { ((DISAGREED++)); continue; }
-    [[ -f "$UNCERTAIN_DIR/$BASENAME" ]] && { ((UNCERTAIN++)); continue; }
+    [[ -f "$VERIFIED_DIR/$BASENAME" ]] && { ((VERIFIED++)) || true; continue; }
+    [[ -f "$DISAGREED_DIR/$BASENAME" ]] && { ((DISAGREED++)) || true; continue; }
+    [[ -f "$UNCERTAIN_DIR/$BASENAME" ]] && { ((UNCERTAIN++)) || true; continue; }
 
     CONV_TEXT=$(jq -r '.conversation_text // "N/A"' "$finding" 2>/dev/null)
     FINDING_TYPE=$(jq -r '.finding_type // "UNKNOWN"' "$finding" 2>/dev/null)
@@ -54,7 +54,7 @@ for finding in "$FINDINGS_DIR"/*.json; do
 
     if [[ -z "$CONTENT" ]]; then
         echo "WARN: empty response for $BASENAME" >&2
-        ((ERRORS++))
+        ((ERRORS++)) || true
         continue
     fi
 
@@ -66,9 +66,9 @@ for finding in "$FINDINGS_DIR"/*.json; do
         '. + {grok_verdict: $verdict, grok_reason: $reason}' "$finding")
 
     case "$VERDICT" in
-        AGREE)    echo "$VERIFIED_FINDING" > "$VERIFIED_DIR/$BASENAME"; ((VERIFIED++)) ;;
-        DISAGREE) echo "$VERIFIED_FINDING" > "$DISAGREED_DIR/$BASENAME"; ((DISAGREED++)) ;;
-        *)        echo "$VERIFIED_FINDING" > "$UNCERTAIN_DIR/$BASENAME"; ((UNCERTAIN++)) ;;
+        AGREE)    echo "$VERIFIED_FINDING" > "$VERIFIED_DIR/$BASENAME"; ((VERIFIED++)) || true ;;
+        DISAGREE) echo "$VERIFIED_FINDING" > "$DISAGREED_DIR/$BASENAME"; ((DISAGREED++)) || true ;;
+        *)        echo "$VERIFIED_FINDING" > "$UNCERTAIN_DIR/$BASENAME"; ((UNCERTAIN++)) || true ;;
     esac
 
     sleep 1  # Rate limiting
