@@ -1,11 +1,11 @@
 #!/bin/bash
 set -uo pipefail
 
-CEREBRO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+CEREBRO_DIR="/home/js/eidos/CereBRO"
 COUNT=${1:-50}
 OUTPUT_DIR=${2:-"$CEREBRO_DIR/data/generation/output/$(date +%Y-%m-%d)"}
 PROMPT_DIR="$CEREBRO_DIR/data/generation/prompts"
-SLR_ENDPOINT="${SLR_ENDPOINT:-http://192.168.14.69:8080}"
+SLR_ENDPOINT="${SLR_ENDPOINT:-http://192.168.14.69:8081}"
 
 mkdir -p "$OUTPUT_DIR"
 

@@ -164,23 +164,31 @@ fi
 log_phase "PREFLIGHT" "All services healthy"
 
 # ---------------------------------------------------------------------------
-# Phase 3: Generate conversations
+# Phase 3: Generate conversations (skipped if cold queue already populated dir)
 # ---------------------------------------------------------------------------
-log_phase "GENERATE" "Generating $COUNT conversations..."
 mkdir -p "$CONV_DIR"
+EXISTING_CONVS=$(ls "$CONV_DIR"/*.json 2>/dev/null | wc -l)
 
-if "$CEREBRO_DIR/scripts/generate-conversations.sh" "$COUNT" "$CONV_DIR" 2>&1 | tee -a "$PHASES_LOG"; then
-    CONVS_GENERATED=$(ls "$CONV_DIR"/*.json 2>/dev/null | wc -l)
-    log_phase "GENERATE" "Generated: $CONVS_GENERATED files in $CONV_DIR"
+if [[ "$EXISTING_CONVS" -gt 0 ]]; then
+    # Cold queue feeder has already deposited conversations — skip generation.
+    CONVS_GENERATED=$EXISTING_CONVS
+    log_phase "GENERATE" "Skipping generation — found $CONVS_GENERATED existing conversations from cold queue"
 else
-    log_error "GENERATE" "generate-conversations.sh exited non-zero"
-    CONVS_GENERATED=$(ls "$CONV_DIR"/*.json 2>/dev/null | wc -l)
+    # Fallback: no cold queue output yet — generate directly (backward compat).
+    log_phase "GENERATE" "No cold queue output found — generating $COUNT conversations directly..."
+    if "$CEREBRO_DIR/scripts/generate-conversations.sh" "$COUNT" "$CONV_DIR" 2>&1 | tee -a "$PHASES_LOG"; then
+        CONVS_GENERATED=$(ls "$CONV_DIR"/*.json 2>/dev/null | wc -l)
+        log_phase "GENERATE" "Generated: $CONVS_GENERATED files in $CONV_DIR"
+    else
+        log_error "GENERATE" "generate-conversations.sh exited non-zero"
+        CONVS_GENERATED=$(ls "$CONV_DIR"/*.json 2>/dev/null | wc -l)
+    fi
 fi
 
 if [[ "$CONVS_GENERATED" -eq 0 ]]; then
-    ABORT_REASON="zero conversations generated"
+    ABORT_REASON="zero conversations available"
     log_phase "GENERATE" "ABORT: nothing to process"
-    pts_notify "CereBRO nightly: Phase 3 generated 0 conversations. SLR endpoint may be down."
+    pts_notify "CereBRO nightly: Phase 3 found 0 conversations. Cold queue feeder and direct generation both produced nothing."
     exit 1
 fi
 

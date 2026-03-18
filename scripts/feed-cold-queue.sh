@@ -4,7 +4,7 @@
 # Only submits if cold queue has room (< half capacity).
 set -uo pipefail
 
-CEREBRO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+CEREBRO_DIR="/home/js/eidos/CereBRO"
 SLR_ENDPOINT="${SLR_ENDPOINT:-http://192.168.14.69:8081}"
 PROMPT_DIR="$CEREBRO_DIR/data/generation/prompts"
 BATCH_SIZE=5  # conversations per invocation

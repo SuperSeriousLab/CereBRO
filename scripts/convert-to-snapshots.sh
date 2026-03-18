@@ -31,8 +31,8 @@ for f in "$INPUT_DIR"/*.json; do
     TOPIC=$(echo "$CONTENT" | jq -r '.topic // "unknown"' 2>/dev/null)
     TURN_COUNT=$(echo "$TURNS" | jq 'length' 2>/dev/null)
 
-    # Convert to ConversationSnapshot NDJSON format
-    jq -n \
+    # Convert to ConversationSnapshot NDJSON format (compact single line — cerebro-batch reads line-by-line)
+    jq -cn \
         --arg id "$BASENAME" \
         --arg topic "$TOPIC" \
         --argjson turns "$TURNS" \
