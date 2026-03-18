@@ -1,0 +1,61 @@
+# Compound Pathology Aggregator COG manifest.
+# PURE deterministic — no LLM calls. Tier 3 meta-COG.
+# Reads signals from all active Tier 1 and Tier 2 COG findings and computes
+# a compound pathology risk score using a Mamdani FIS (fugo).
+# Emits COMPOUND_PATHOLOGY when compound_risk > 0.6.
+# Layer 4 (Integration & Meta) — runs after all other COGs.
+
+name: "compound-pathology-aggregator"
+version: "0.1.0"
+language: GO
+determinism: PURE
+
+ports {
+  name: "tier1_tier2_assessments"
+  direction: IN
+  message_type: "cog.reasoning.v1.CognitiveAssessment"
+}
+
+ports {
+  name: "compound_pathology_finding"
+  direction: OUT
+  message_type: "cog.reasoning.v1.CognitiveAssessment"
+}
+
+ports {
+  name: "_error"
+  direction: OUT
+  message_type: "cog.core.v1.ErrorEvent"
+}
+
+contracts {
+  packages: "cog.reasoning.v1"
+  packages: "cog.core.v1"
+  proto_hash: "sha256:pending"
+}
+
+config {
+  fields {
+    name: "emit_threshold"
+    type: DOUBLE
+    default_value: "0.6"
+    required: false
+    description: "compound_risk above which COMPOUND_PATHOLOGY finding is emitted (0.0-1.0)"
+    min_value: "0.0"
+    max_value: "1.0"
+    evolvable: true
+  }
+}
+
+description: "Tier 3 meta-COG — Mamdani FIS aggregator that computes compound pathology risk from active_detector_count, max_single_severity, and avg_confidence. Emits COMPOUND_PATHOLOGY finding when compound_risk > threshold."
+
+tags: "cognitive"
+tags: "cerebro"
+tags: "tier3"
+tags: "meta-cog"
+tags: "fuzzy"
+tags: "pure"
+
+lineage {
+  level: HAND_WRITTEN
+}
