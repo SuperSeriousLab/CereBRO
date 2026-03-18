@@ -44,6 +44,9 @@ type PipelineConfig struct {
 	SophrimEndpoint     string                   // if non-empty, fetch DomainContext before pipeline run (advisory, 200ms timeout)
 	ConceptualAnchoring ConceptualAnchoringConfig // Tier 2: conceptual anchoring detector
 	InheritedPosition   InheritedPositionConfig   // Tier 2: inherited-position detector
+	EvidenceAsymmetry        EvidenceAsymmetryConfig        // Tier 2: evidence grounding asymmetry detector (gen4_78+gen4_86)
+	SustainedConviction      SustainedConvictionConfig      // Tier 1: sustained conviction rolling-MV detector (gen0_76)
+	UnderevidencedClaims     UnderevidencedClaimsConfig     // Tier 1: evidence-to-positive-claim ratio detector (gen10_89)
 	DetectorFuzzy       *DetectorFuzzy            // L2 fuzzy severity (nil = crisp fallback)
 	FuzzyUrgency        *FuzzyUrgency             // L1 fuzzy urgency (nil = crisp fallback)
 	Arbitrator          *CrossLayerArbitrator     // Cross-layer arbitration (nil = passthrough)
@@ -63,12 +66,28 @@ type PipelineConfig struct {
 	// set directly when constructing PipelineConfig.
 	PTSEndpoint string
 
+	// OutcomeStore, when non-nil, records each injected finding for
+	// offline TP/FP validation. Records are written fire-and-forget
+	// and never block the pipeline. Populate via NewOutcomeStore().
+	OutcomeStore *OutcomeStore
+
 	// Logger is an optional zerolog.Logger for structured training data events.
 	// When set, a single "cerebro_pipeline_run" Info event is emitted at the
 	// end of every Run() call with full pipeline telemetry.
 	// Use zerolog.Nop() (or leave as zero value — same effect) to disable logging.
 	// Logging is skipped when Logger.GetLevel() == zerolog.Disabled.
 	Logger zerolog.Logger
+
+	// DorangDebate configures optional DORIANG arbitration for conflicting L2
+	// detector findings. When Enabled=false (the default), no external calls are
+	// made and the aggregator proceeds with normal aggregation.
+	//
+	// Fields:
+	//   Enabled        bool   — default: false
+	//   Host           string — default: "http://192.168.14.71:8080"
+	//   CouncilID      string — default: "tech-review"
+	//   TimeoutSeconds int    — default: 30
+	DorangDebate DorangArbitratorConfig
 }
 
 // DefaultPipelineConfig returns all-default detector configurations.
@@ -88,6 +107,9 @@ func DefaultPipelineConfig() PipelineConfig {
 		Feedback:            DefaultFeedbackConfig(),
 		ConceptualAnchoring: DefaultConceptualAnchoringConfig(),
 		InheritedPosition:   DefaultInheritedPositionConfig(),
+		EvidenceAsymmetry:    DefaultEvidenceAsymmetryConfig(),
+		SustainedConviction:  DefaultSustainedConvictionConfig(),
+		UnderevidencedClaims: DefaultUnderevidencedClaimsConfig(),
 	}
 }
 
@@ -234,8 +256,20 @@ func Run(snap *reasoningv1.ConversationSnapshot, cfg PipelineConfig) *PipelineRe
 		aggregateFindings = salienceResult.Salient // Only salient findings pass to Aggregator
 	}
 
-	// Stage 5: Aggregate
-	report := Aggregate(aggregateFindings, snap.GetObjective())
+	// Stage 5: Aggregate (with optional DORIANG conflict arbitration).
+	// When DorangDebate.Enabled is true, conflicting detector findings are routed
+	// to DORIANG for a 2-round structured debate before aggregation. If DORIANG
+	// times out or returns an error, aggregation proceeds with original findings.
+	dorangArb := NewDorangArbitrator(cfg.DorangDebate)
+	var report *reasoningv1.ReasoningReport
+	if dorangArb != nil {
+		arbCtx, arbCancel := context.WithTimeout(context.Background(),
+			time.Duration(cfg.DorangDebate.TimeoutSeconds)*time.Second)
+		report = AggregateWithArbitration(arbCtx, aggregateFindings, snap.GetObjective(), dorangArb)
+		arbCancel()
+	} else {
+		report = Aggregate(aggregateFindings, snap.GetObjective())
+	}
 
 	// Stage 6: Self-Confidence Assessor (Phase 4)
 	var selfConf *cerebrov1.SelfConfidenceReport
@@ -269,7 +303,14 @@ func Run(snap *reasoningv1.ConversationSnapshot, cfg PipelineConfig) *PipelineRe
 			}
 
 			// Re-aggregate with updated findings (second pass).
-			report = Aggregate(updatedFindings, snap.GetObjective())
+			if dorangArb != nil {
+				arbCtx2, arbCancel2 := context.WithTimeout(context.Background(),
+					time.Duration(cfg.DorangDebate.TimeoutSeconds)*time.Second)
+				report = AggregateWithArbitration(arbCtx2, updatedFindings, snap.GetObjective(), dorangArb)
+				arbCancel2()
+			} else {
+				report = Aggregate(updatedFindings, snap.GetObjective())
+			}
 		}
 	}
 
@@ -331,7 +372,7 @@ func Run(snap *reasoningv1.ConversationSnapshot, cfg PipelineConfig) *PipelineRe
 	// to the Problem Tracking System for human triage.
 	maybeSendPTSSignals(result, cfg.PTSEndpoint)
 	// Inject high-confidence findings (>= 0.6) into PTS via POST /inject.
-	maybeInjectPTSFindings(result, cfg.PTSEndpoint)
+	maybeInjectPTSFindings(result, cfg.PTSEndpoint, cfg.OutcomeStore)
 
 	// Stage 11: Training data log event (optional — zero Logger = no-op).
 	// Emits one structured event per Run() with full pipeline telemetry for
@@ -529,6 +570,25 @@ func buildDetectorMap(cfg PipelineConfig) map[Detector]DetectorFunc {
 	// without independent justification. Distinct from sunk-cost and conceptual anchoring.
 	m[DetectorInheritedPosition] = func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
 		return DetectInheritedPosition(snap, cfg.InheritedPosition)
+	}
+
+	// Evidence Asymmetry: fires when negative claims are better-evidenced than positive
+	// claims by more than MiscalibrationThreshold (default 1.5×). Combined gen4_78 + gen4_86.
+	m[DetectorEvidenceAsymmetry] = func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
+		return DetectEvidenceAsymmetry(snap, cfg.EvidenceAsymmetry)
+	}
+
+	// SustainedConviction: fires when rolling avg MV of last 5 assistant-turn claims
+	// exceeds 0.595. Implements gen0_76 (SustainedConvictionSignal_v5). Tier1_Bias.
+	m[DetectorSustainedConviction] = func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
+		return DetectSustainedConviction(snap, cfg.SustainedConviction)
+	}
+
+	// UnderevidencedClaims: fires when evidence_turns/positive_claim_turns <= 0.331.
+	// Implements gen10_89 (UndevidencedPositiveClaimRatio). Tier1_Bias.
+	// SYCOPHANCY finding — positive assessments without supporting evidence grounding.
+	m[DetectorUnderevidencedClaims] = func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
+		return DetectUnderevidencedPositiveClaims(snap, cfg.UnderevidencedClaims)
 	}
 
 	return m
