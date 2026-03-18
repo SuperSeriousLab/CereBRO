@@ -9,7 +9,7 @@
 | Run | TP | FP | FN | Precision | Recall | F1 |
 |-----|----|----|----|-----------|-----------|----|
 | baseline             |  33 |  41 |  39 | 0.446 | 0.458 | 0.452 |
-| inhibitor-only       |  25 |  29 |  47 | 0.463 | 0.347 | 0.397 |
+| inhibitor-only       |  25 |  31 |  47 | 0.446 | 0.347 | 0.391 |
 
 ## Per-Detector Breakdown (baseline config)
 
@@ -51,23 +51,23 @@ Expected CONFIDENCE_MISCALIBRATION in 13 entries, found in 1 (8%)
 | Profile | Winner |
 |---------|--------|
 | balanced             | E-pre-cortex |
-| precision-first      | A-full-cortex |
+| precision-first      | B-no-feedback |
 | recall-first         | E-pre-cortex |
 | minimal              | E-pre-cortex |
 
 ### Pareto Frontier
 
-Pareto-optimal variants: **A-full-cortex, B-no-feedback, D-inhibitor-only, E-pre-cortex**
+Pareto-optimal variants: **A-full-cortex, B-no-feedback, C-no-modulation, D-inhibitor-only, E-pre-cortex**
 
 ### Variant Trait Matrix
 
 | Variant | Precision | Recall | F1 | FPR | Latency(ms) | P95(ms) | TP | FP | FN |
 |---------|-----------|--------|----|-----|-------------|---------|----|----|-----|
-| A-full-cortex          | 0.645 | 0.278 | 0.388 | 0.500 | 1.00 | 2.62 | 20 | 11 | 52 |
-| B-no-feedback          | 0.645 | 0.278 | 0.388 | 0.500 | 1.97 | 5.98 | 20 | 11 | 52 |
-| C-no-modulation        | 0.625 | 0.278 | 0.385 | 0.750 | 2.79 | 7.29 | 20 | 12 | 52 |
-| D-inhibitor-only       | 0.625 | 0.278 | 0.385 | 0.750 | 1.83 | 4.54 | 20 | 12 | 52 |
-| E-pre-cortex           | 0.548 | 0.319 | 0.404 | 1.000 | 1.55 | 3.91 | 23 | 19 | 49 |
+| A-full-cortex          | 0.606 | 0.278 | 0.381 | 0.750 | 0.76 | 1.92 | 20 | 13 | 52 |
+| B-no-feedback          | 0.606 | 0.278 | 0.381 | 0.750 | 0.84 | 2.34 | 20 | 13 | 52 |
+| C-no-modulation        | 0.588 | 0.278 | 0.377 | 1.000 | 0.72 | 1.80 | 20 | 14 | 52 |
+| D-inhibitor-only       | 0.588 | 0.278 | 0.377 | 1.000 | 0.82 | 2.16 | 20 | 14 | 52 |
+| E-pre-cortex           | 0.548 | 0.319 | 0.404 | 1.000 | 0.76 | 2.02 | 23 | 19 | 49 |
 
 ### Profile Score Matrix
 
@@ -75,16 +75,16 @@ Pareto-optimal variants: **A-full-cortex, B-no-feedback, D-inhibitor-only, E-pre
 
 | Profile | A-full-cortex          | B-no-feedback          | C-no-modulation        | D-inhibitor-only       | E-pre-cortex           |
 |---------|-----------------------|-----------------------|-----------------------|-----------------------|-----------------------|
-| balanced | 0.7777                 | 0.6924                 | 0.6225                 | 0.7493                 | 0.8002                 |
-| precision-first | 0.8116                 | 0.8024                 | 0.7234                 | 0.7614                 | 0.6952                 |
-| recall-first | 0.8027                 | 0.7808                 | 0.7445                 | 0.8164                 | 0.8815                 |
-| minimal | 0.5560                 | 0.5338                 | 0.4697                 | 0.6718                 | 0.7361                 |
+| balanced | 0.6432                 | 0.6240                 | 0.6608                 | 0.6648                 | 0.7226                 |
+| precision-first | 0.7305                 | 0.7341                 | 0.6776                 | 0.6924                 | 0.6993                 |
+| recall-first | 0.7434                 | 0.7469                 | 0.7543                 | 0.7798                 | 0.8541                 |
+| minimal | 0.4421                 | 0.4706                 | 0.4935                 | 0.6027                 | 0.6704                 |
 
 ## Key Observations
 
 1. **D-inhibitor-only did NOT dominate**: wins only 0/4 profiles — harder classical text may favor more complex variants.
 
-2. **Full pipeline does not significantly outperform D-inhibitor-only** (F1: 0.388 vs 0.385). Simpler pipeline is preferred for classical text.
+2. **Full pipeline does not significantly outperform D-inhibitor-only** (F1: 0.381 vs 0.377). Simpler pipeline is preferred for classical text.
 
 3. **Scope drift detection challenges**: Classical philosophical dialogue redefines scope by design — Socrates deliberately shifts scope to expose contradictions. High FP rate expected for SCOPE_DRIFT.
 

@@ -21,61 +21,61 @@
 
 | Variant | Precision | Recall | F1 | TP | FP | FN |
 |---------|-----------|--------|----|----|----|----|
-| A-full-cortex          | 0.833 | 1.000 | **0.909** | 10 | 2 | 0 |
-| B-no-feedback          | 0.833 | 1.000 | **0.909** | 10 | 2 | 0 |
-| C-no-modulation        | 0.833 | 1.000 | **0.909** | 10 | 2 | 0 |
-| D-inhibitor-only       | 0.833 | 1.000 | **0.909** | 10 | 2 | 0 |
-| E-pre-cortex           | 0.667 | 1.000 | **0.800** | 10 | 5 | 0 |
+| A-full-cortex          | 0.846 | 1.000 | **0.917** | 11 | 2 | 0 |
+| B-no-feedback          | 0.846 | 1.000 | **0.917** | 11 | 2 | 0 |
+| C-no-modulation        | 0.846 | 1.000 | **0.917** | 11 | 2 | 0 |
+| D-inhibitor-only       | 0.846 | 1.000 | **0.917** | 11 | 2 | 0 |
+| E-pre-cortex           | 0.688 | 1.000 | **0.815** | 11 | 5 | 0 |
 
 ### Classical Corpus (DomainContext classical confidence=0.85, 43 entries)
 
 | Variant | Precision | Recall | F1 | TP | FP | FN |
 |---------|-----------|--------|----|----|----|----|
-| A-full-cortex          | 0.481 | 0.347 | **0.403** | 25 | 27 | 47 |
-| B-no-feedback          | 0.481 | 0.347 | **0.403** | 25 | 27 | 47 |
-| C-no-modulation        | 0.472 | 0.347 | **0.400** | 25 | 28 | 47 |
-| D-inhibitor-only       | 0.472 | 0.347 | **0.400** | 25 | 28 | 47 |
+| A-full-cortex          | 0.463 | 0.347 | **0.397** | 25 | 29 | 47 |
+| B-no-feedback          | 0.463 | 0.347 | **0.397** | 25 | 29 | 47 |
+| C-no-modulation        | 0.455 | 0.347 | **0.394** | 25 | 30 | 47 |
+| D-inhibitor-only       | 0.455 | 0.347 | **0.394** | 25 | 30 | 47 |
 | E-pre-cortex           | 0.446 | 0.458 | **0.452** | 33 | 41 | 39 |
 
 ### Combined Summary
 
 | Variant | Modern F1 | Classical F1 | Combined F1 | Latency(ms) | Stages |
 |---------|-----------|-------------|-------------|-------------|--------|
-| A-full-cortex          | 0.909 | 0.403 | **0.479** | 4.205 | 12 |
-| B-no-feedback          | 0.909 | 0.403 | **0.479** | 4.117 | 10 |
-| C-no-modulation        | 0.909 | 0.400 | **0.476** | 4.338 | 10 |
-| D-inhibitor-only       | 0.909 | 0.400 | **0.476** | 2.869 | 5 |
-| E-pre-cortex           | 0.800 | 0.452 | **0.503** | 3.012 | 4 |
+| A-full-cortex          | 0.917 | 0.397 | **0.480** | 3.277 | 12 |
+| B-no-feedback          | 0.917 | 0.397 | **0.480** | 2.807 | 10 |
+| C-no-modulation        | 0.917 | 0.394 | **0.477** | 2.218 | 10 |
+| D-inhibitor-only       | 0.917 | 0.394 | **0.477** | 2.161 | 5 |
+| E-pre-cortex           | 0.815 | 0.452 | **0.509** | 1.468 | 4 |
 
 ## Winners
 
 | Category | Winner | F1 |
 |----------|--------|----|
-| Modern   | A-full-cortex | 0.909 |
+| Modern   | A-full-cortex | 0.917 |
 | Classical | E-pre-cortex | 0.452 |
-| Combined | E-pre-cortex | 0.503 |
+| Combined | E-pre-cortex | 0.509 |
 
 ## Key Questions
 
 ### Q1: Does D-inhibitor-only still win on modern text?
 
-**YES** — D-inhibitor-only F1=0.909 (tied for best or best on modern corpus).
+**YES** — D-inhibitor-only F1=0.917 (tied for best or best on modern corpus).
 
 ### Q2: Does domain context change the winner on classical text?
 
-**YES** — Classical winner is **E-pre-cortex** (F1=0.452). D-inhibitor-only scores F1=0.400 on classical text.
+**YES** — Classical winner is **E-pre-cortex** (F1=0.452). D-inhibitor-only scores F1=0.394 on classical text.
 
 Domain adjustments (lower DriftThreshold, lower SustainedTurns, higher MinCertaintyWords,
 skip numeric anchoring, activate conceptual anchoring) shift the balance between variants.
 
 ### Q3: Does the full pipeline (A) outperform D on classical text?
 
-**YES** — A-full-cortex F1=0.403 vs D-inhibitor-only F1=0.400 on classical corpus.
+**YES** — A-full-cortex F1=0.397 vs D-inhibitor-only F1=0.394 on classical corpus.
 The extra layers (modulation, salience, metacognition) add value on classical text.
 
 ### Q4: Which variant wins on COMBINED (modern + classical)?
 
-**E-pre-cortex** — combined F1=0.503 (TP/FP/FN aggregated over both corpora).
+**E-pre-cortex** — combined F1=0.509 (TP/FP/FN aggregated over both corpora).
 
 ## Notes
 

@@ -31,11 +31,11 @@
 
 | Variant | Precision | Recall | F1 | FPR | Latency(ms) | P95(ms) | TP | FP | FN |
 |---------|-----------|--------|----|-----|-------------|---------|----|----|-----|
-| A-full-cortex          | 0.736 | 0.317 | 0.443 | 0.182 | 1.14 | 3.36 | 39 | 14 | 84 |
-| B-no-feedback          | 0.736 | 0.317 | 0.443 | 0.182 | 0.71 | 2.39 | 39 | 14 | 84 |
-| C-no-modulation        | 0.714 | 0.325 | 0.447 | 0.273 | 0.84 | 2.74 | 40 | 16 | 83 |
-| D-inhibitor-only       | 0.714 | 0.325 | 0.447 | 0.273 | 0.86 | 2.75 | 40 | 16 | 83 |
-| E-pre-cortex           | 0.592 | 0.366 | 0.452 | 0.545 | 0.58 | 2.05 | 45 | 31 | 78 |
+| A-full-cortex          | 0.696 | 0.317 | 0.436 | 0.273 | 0.73 | 2.20 | 39 | 17 | 84 |
+| B-no-feedback          | 0.696 | 0.317 | 0.436 | 0.273 | 0.71 | 1.90 | 39 | 17 | 84 |
+| C-no-modulation        | 0.678 | 0.325 | 0.440 | 0.364 | 0.69 | 1.69 | 40 | 19 | 83 |
+| D-inhibitor-only       | 0.678 | 0.325 | 0.440 | 0.364 | 0.68 | 1.89 | 40 | 19 | 83 |
+| E-pre-cortex           | 0.584 | 0.366 | 0.450 | 0.545 | 0.53 | 1.53 | 45 | 32 | 78 |
 
 ### Profile Winners
 
@@ -52,10 +52,10 @@
 
 | Profile | A-full-cortex          | B-no-feedback          | C-no-modulation        | D-inhibitor-only       | E-pre-cortex           |
 |---------|-----------------------|-----------------------|-----------------------|-----------------------|-----------------------|
-| balanced | 0.6230                 | 0.7221                 | 0.6957                 | 0.7304                 | 0.7925                 |
-| precision-first | 0.8160                 | 0.8434                 | 0.7963                 | 0.8163                 | 0.6797                 |
-| recall-first | 0.7416                 | 0.7929                 | 0.7876                 | 0.8234                 | 0.8792                 |
-| minimal | 0.4316                 | 0.5556                 | 0.5333                 | 0.6631                 | 0.7402                 |
+| balanced | 0.6189                 | 0.6494                 | 0.6655                 | 0.6956                 | 0.7572                 |
+| precision-first | 0.7803                 | 0.7898                 | 0.7512                 | 0.7727                 | 0.6827                 |
+| recall-first | 0.7388                 | 0.7541                 | 0.7640                 | 0.8027                 | 0.8628                 |
+| minimal | 0.4288                 | 0.4809                 | 0.4883                 | 0.6241                 | 0.7006                 |
 
 ### Pareto Frontier
 
@@ -67,11 +67,11 @@ Previous results from CLASSICAL_ANALYSIS.md (43-entry classical corpus):
 
 | Variant | Classical P/R/F1 | Full Corpus P/R/F1 | F1 Change |
 |---------|------------------|--------------------|-----------|
-| A-full-cortex          | 0.600 / 0.208 / 0.309 | 0.736 / 0.317 / 0.443 | +0.134 |
-| B-no-feedback          | 0.600 / 0.208 / 0.309 | 0.736 / 0.317 / 0.443 | +0.134 |
-| C-no-modulation        | 0.577 / 0.208 / 0.306 | 0.714 / 0.325 / 0.447 | +0.141 |
-| D-inhibitor-only       | 0.577 / 0.208 / 0.306 | 0.714 / 0.325 / 0.447 | +0.141 |
-| E-pre-cortex           | 0.471 / 0.333 / 0.390 | 0.592 / 0.366 / 0.452 | +0.062 |
+| A-full-cortex          | 0.600 / 0.208 / 0.309 | 0.696 / 0.317 / 0.436 | +0.127 |
+| B-no-feedback          | 0.600 / 0.208 / 0.309 | 0.696 / 0.317 / 0.436 | +0.127 |
+| C-no-modulation        | 0.577 / 0.208 / 0.306 | 0.678 / 0.325 / 0.440 | +0.134 |
+| D-inhibitor-only       | 0.577 / 0.208 / 0.306 | 0.678 / 0.325 / 0.440 | +0.134 |
+| E-pre-cortex           | 0.471 / 0.333 / 0.390 | 0.584 / 0.366 / 0.450 | +0.060 |
 
 Previous profile winners (classical 43-entry corpus):
 
@@ -91,16 +91,16 @@ Previous profile winners (classical 43-entry corpus):
 ### Do modulation/feedback/salience layers earn their keep on harder, more diverse input?
 
 F1 scores on full corpus:
-- A-full-cortex (all layers): 0.443
-- B-no-feedback (no metacognition): 0.443
-- C-no-modulation (no urgency/threshold): 0.447
-- D-inhibitor-only (minimal): 0.447
+- A-full-cortex (all layers): 0.436
+- B-no-feedback (no metacognition): 0.436
+- C-no-modulation (no urgency/threshold): 0.440
+- D-inhibitor-only (minimal): 0.440
 
-**No** — A-full-cortex F1 (0.443) does not meaningfully exceed D-inhibitor-only (0.447). The extra layers (modulation, feedback, salience) do not pay their way on this corpus.
+**No** — A-full-cortex F1 (0.436) does not meaningfully exceed D-inhibitor-only (0.440). The extra layers (modulation, feedback, salience) do not pay their way on this corpus.
 
-**Feedback layer verdict**: B-no-feedback (0.443 F1) matches A-full-cortex (0.443) — the metacognition/feedback loop adds negligible value.
+**Feedback layer verdict**: B-no-feedback (0.436 F1) matches A-full-cortex (0.436) — the metacognition/feedback loop adds negligible value.
 
-**Modulation layer verdict**: C-no-modulation (0.447 F1) is comparable to B-no-feedback (0.443) — urgency/threshold modulation adds marginal value.
+**Modulation layer verdict**: C-no-modulation (0.440 F1) is comparable to B-no-feedback (0.436) — urgency/threshold modulation adds marginal value.
 
 **Profile wins summary**: A wins 0/4, B wins 1/4 profiles. The winner is E-pre-cortex.
 
