@@ -18,6 +18,10 @@ const (
 	DetectorLedger                Detector = "decision-ledger"
 	DetectorConceptualAnchoring   Detector = "conceptual-anchoring-detector"
 	DetectorInheritedPosition     Detector = "inherited-position-detector"
+	DetectorEvidenceAsymmetry     Detector = "evidence-asymmetry-detector"
+	DetectorSustainedConviction   Detector = "sustained-conviction-detector"
+	DetectorUnderevidencedClaims  Detector = "underevidenced-claims"
+	DetectorNegativeClaim         Detector = "negative-claim-confidence"
 )
 
 // RouterConfig holds activation thresholds.
@@ -203,6 +207,57 @@ func Route(snap *reasoningv1.ConversationSnapshot, cfg RouterConfig) RoutingDeci
 		if hasAuthorityCitation {
 			activated = append(activated, DetectorInheritedPosition)
 			reasons = append(reasons, "authority citation patterns detected — checking for inherited-position reasoning")
+		}
+	}
+
+	// Evidence Asymmetry: activate when conversation has ≥ 4 turns and at least 2
+	// assistant turns. Measures evidence grounding ratio of positive vs negative claims.
+	if nTurns >= 4 {
+		assistantTurns := uint32(0)
+		for _, t := range turns {
+			if strings.ToLower(t.GetSpeaker()) == "assistant" {
+				assistantTurns++
+			}
+		}
+		if assistantTurns >= 2 {
+			activated = append(activated, DetectorEvidenceAsymmetry)
+			reasons = append(reasons, "multi-turn assistant responses — checking evidence grounding asymmetry")
+		}
+	}
+
+	// SustainedConviction: activate on any conversation with at least 1 assistant turn.
+	// Tier1_Bias — checks rolling MV of recent claims for pathological conviction patterns.
+	for _, t := range turns {
+		if strings.ToLower(t.GetSpeaker()) == "assistant" {
+			activated = append(activated, DetectorSustainedConviction)
+			reasons = append(reasons, "assistant turns present — checking sustained conviction signal")
+			break
+		}
+	}
+
+	// UnderevidencedClaims: activate when conversation has ≥ 2 assistant turns.
+	// Tier1_Bias — checks evidence-to-positive-claim ratio (gen10_89).
+	{
+		assistantCount := 0
+		for _, t := range turns {
+			if strings.ToLower(t.GetSpeaker()) == "assistant" {
+				assistantCount++
+			}
+		}
+		if assistantCount >= 2 {
+			activated = append(activated, DetectorUnderevidencedClaims)
+			reasons = append(reasons, "multiple assistant turns — checking evidence-to-positive-claim ratio")
+		}
+	}
+
+	// NegativeClaim: activate when conversation has ≥ 1 assistant turn.
+	// Tier2_Structural — MaxMV(negative-direction claims) > 0.45 (gen0_93).
+	// Fires CATHEDRAL_COMPLEXITY or COUNTER_EVIDENCE_DEPLETION.
+	for _, t := range turns {
+		if strings.ToLower(t.GetSpeaker()) == "assistant" {
+			activated = append(activated, DetectorNegativeClaim)
+			reasons = append(reasons, "assistant turns present — checking negative-claim high-confidence signal")
+			break
 		}
 	}
 

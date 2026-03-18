@@ -47,6 +47,7 @@ type PipelineConfig struct {
 	EvidenceAsymmetry        EvidenceAsymmetryConfig        // Tier 2: evidence grounding asymmetry detector (gen4_78+gen4_86)
 	SustainedConviction      SustainedConvictionConfig      // Tier 1: sustained conviction rolling-MV detector (gen0_76)
 	UnderevidencedClaims     UnderevidencedClaimsConfig     // Tier 1: evidence-to-positive-claim ratio detector (gen10_89)
+	NegativeClaim            NegativeClaimConfig            // Tier 2: MaxMV(negative-direction claims) > 0.45 (gen0_93)
 	DetectorFuzzy       *DetectorFuzzy            // L2 fuzzy severity (nil = crisp fallback)
 	FuzzyUrgency        *FuzzyUrgency             // L1 fuzzy urgency (nil = crisp fallback)
 	Arbitrator          *CrossLayerArbitrator     // Cross-layer arbitration (nil = passthrough)
@@ -116,6 +117,7 @@ func DefaultPipelineConfig() PipelineConfig {
 		EvidenceAsymmetry:    DefaultEvidenceAsymmetryConfig(),
 		SustainedConviction:  DefaultSustainedConvictionConfig(),
 		UnderevidencedClaims: DefaultUnderevidencedClaimsConfig(),
+		NegativeClaim:        DefaultNegativeClaimConfig(),
 	}
 }
 
@@ -608,6 +610,13 @@ func buildDetectorMap(cfg PipelineConfig) map[Detector]DetectorFunc {
 	// SYCOPHANCY finding — positive assessments without supporting evidence grounding.
 	m[DetectorUnderevidencedClaims] = func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
 		return DetectUnderevidencedPositiveClaims(snap, cfg.UnderevidencedClaims)
+	}
+
+	// NegativeClaim: fires CATHEDRAL_COMPLEXITY or COUNTER_EVIDENCE_DEPLETION when
+	// MaxMV(negative-direction assistant claims) > 0.45. Implements gen0_93
+	// (NegativeClaimHighConfidenceSignal). Tier2_Structural.
+	m[DetectorNegativeClaim] = func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
+		return DetectNegativeClaimHighConfidence(snap, cfg.NegativeClaim)
 	}
 
 	return m

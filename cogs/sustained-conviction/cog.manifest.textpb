@@ -1,0 +1,83 @@
+# Sustained Conviction Signal COG manifest.
+# PURE deterministic — rolling MV conviction detector (gen0_76, SustainedConvictionSignal_v5).
+# Fires when avg MV of last 5 assistant-turn claims > 0.595.
+# Tier1_Bias — Layer 2 (Cortical Specialists / Detectors).
+
+name: "sustained-conviction-detector"
+version: "0.1.0"
+language: GO
+determinism: PURE
+
+ports {
+  name: "conversation_snapshot"
+  direction: IN
+  message_type: "cog.reasoning.v1.ConversationSnapshot"
+}
+
+ports {
+  name: "assessment"
+  direction: OUT
+  message_type: "cog.reasoning.v1.CognitiveAssessment"
+}
+
+ports {
+  name: "_error"
+  direction: OUT
+  message_type: "cog.core.v1.ErrorEvent"
+}
+
+contracts {
+  packages: "cog.reasoning.v1"
+  packages: "cog.core.v1"
+  proto_hash: "sha256:pending"
+}
+
+config {
+  fields {
+    name: "window_n"
+    type: UINT32
+    default_value: "5"
+    required: false
+    description: "Rolling claim window size (gen0_76 default: 5)"
+    min_value: "1"
+    max_value: "20"
+    evolvable: true
+  }
+  fields {
+    name: "fire_threshold"
+    type: DOUBLE
+    default_value: "0.595"
+    required: false
+    description: "Avg-MV cutoff above which the detector fires (gen0_76: 0.5954)"
+    min_value: "0.0"
+    max_value: "1.0"
+    evolvable: true
+  }
+  fields {
+    name: "min_assistant_turns"
+    type: UINT32
+    default_value: "1"
+    required: false
+    description: "Minimum assistant turns required before detection runs"
+    min_value: "1"
+    max_value: "10"
+    evolvable: false
+  }
+}
+
+description: "Rolling 5-claim MV window detector — fires SYCOPHANCY when avg conviction signal > 0.595. Covers sycophancy, cathedral-complexity, counter-evidence-depletion, confidence-miscalibration. Genesis: gen0_76 (SustainedConvictionSignal_v5)."
+
+tags: "cognitive"
+tags: "cerebro"
+tags: "tier1-bias"
+tags: "pure"
+tags: "genesis"
+
+lineage {
+  level: FORGE_GENERATED
+  genesis_rule: "gen0_76"
+  source_corpus: "full-v4.ndjson"
+  fitness: 94.21
+  precision: 1.0
+  recall: 1.0
+}
