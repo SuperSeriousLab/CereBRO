@@ -1,7 +1,7 @@
 # CereBRO — Roadmap
 
 > **Created:** 2026-03-17
-> **Status:** Phases 1-6 complete. Nightly Loop automated. Lamarckian Loop proven.
+> **Status:** Phases 1-6 complete. Phase 7 in progress (production deployment, cerebro-hook live). Lamarckian Loop proven.
 
 ## Vision
 
@@ -44,75 +44,77 @@ philosophical text (F1=0.45). Self-improving via the Lamarckian Loop.
 
 ### Phase 7: Production Deployment
 
-Activate the nightly loop. Let the system run autonomously and collect
-real data before building more detectors.
+Status: **In Progress** (P7.1-P7.4 delegated, P7.4 complete)
 
-- [ ] Activate cron (`./scripts/setup-cron.sh` — user confirmation gate)
-- [ ] Monitor first 7 nightly runs — review morning reports
-- [ ] Verify consolidator produces corpus entries from generated conversations
-- [ ] Run Lamarckian Cycle 3 on organically expanded corpus
-- [ ] Multi-objective sweep: modern F1 ≥ 0.90 constraint + maximize classical F1
-- [ ] Document production baseline (Cycle 3 results)
+- [x] 7.1 Provision LXC container on Proxmox
+- [x] 7.2 Build and deploy CereBRO gRPC service with fugo fuzzy components
+- [ ] 7.3 Nightly cron pipeline execution (persist findings)
+- [x] 7.4 Replace FuzzyGuard hooks with cerebro-hook binary (536us pipeline, 11 tests)
+- [ ] 7.5 Stability gate — 7 consecutive nightly runs without failure
+- [ ] 7.6 Deploy skill and service registry update
 
-### Phase 8: Corpus Depth
+**Exit:** CereBRO running as production service, real-time Claude Code monitoring via cerebro-hook, nightly pipeline stable for 7 days.
 
-The Forge found diminishing returns on parameters. Future F1 gains come
-from corpus quality, not calibration.
+### Phase 8: Corpus Expansion
 
-- [ ] Grow corpus to 200+ entries via nightly consolidation
-- [ ] Add borderline conversations (almost-triggers for Tier 2 detectors)
-- [ ] Adversarial generator: evolve scope-drift-resistant conversations
-- [ ] Classical library expansion: Meno, Gorgias dialogues
-- [ ] Corpus diversity audit: 40% modern, 30% classical, 20% technical, 10% adversarial
+- [ ] 8.1 Generate 300+ new conversations via SLR (diverse topics, all 4 novel pathology types)
+- [ ] 8.2 Import to shared corpus format (CereBRO + FuzzyGuard + DORIANG compatible)
+- [ ] 8.3 Re-run Genesis on expanded corpus — discover new patterns
+- [ ] 8.4 EDD gate: validate expanded corpus quality (no duplicates, balanced distribution)
 
-### Phase 9: Tier 2 Completion (5 remaining COGs)
+**Exit:** 500+ corpus entries with coverage across all known pathology types. Genesis discovers additional patterns.
 
-Build only what the corpus proves is needed. After Phase 8 corpus expansion,
-measure which failure modes are uncovered. Build COGs for those.
+### Phase 9: Genesis COG Graduates
 
-- [ ] Assumption Surfacer — unstated premises
-- [ ] Circular Reasoning Detector — premise depends on conclusion
-- [ ] Evidence Quality Scorer — anecdotal vs systematic
-- [ ] Status-Quo Bias Detector — default-option preference
-- [ ] Entity Coherence Monitor — identity consistency
+4 novel patterns discovered by FuzzyGuard Genesis on the shared corpus. Two ready to implement, two deferred.
 
-Each: ~250 LOC, PURE/deterministic, same DetectorFunc pattern. Spec in
-`docs/TIER2_SPECS.md`. Build one, measure, then decide on next.
+- [ ] 9.1 CounterEvidenceDepletionCOG (Tier 2, stateless) — reasoning persists without counter-evidence. 29 sessions, 3 Genesis rules with fitness >90, precision 1.0. Inputs: NegEvidence ratio, MaxMV of recent claims.
+- [ ] 9.2 DirectionalLockCOG (Tier 2, stateless) — certainty disconnected from evidence quality. 20 sessions. Inputs: DirectionEntropy, confidence trends. Warning at entropy 0.90, detected at 0.60.
+- [ ] 9.3 Forge-evolve fugo FIS configs for new COGs on expanded corpus
+- [ ] 9.4 Re-validate F1 with new COGs + fuzzy pipeline (target: F1 > 0.91)
+- [ ] 9.5 EDD gate: fuzz new COGs, boundary tests, no regression on existing detectors
 
-### Phase 10: Cross-Domain — Code Review
+**Deferred COGs:**
+- SilentRevisionCOG (Tier 3, stateful) — needs GEARS contract extension for per-claim evidence snapshots. 7 corpus sessions.
+- InheritedPositionCOG (Tier 1, stateless) — thin corpus coverage (3 sessions). Defer until corpus has 20+ examples.
 
-Second domain deployment. Reuse 80% of pipeline (Layers 0, 1, 3, 4, 5).
-Swap Layer 2 detectors for code-analysis variants.
+**Exit:** 2 new COGs deployed in fuzzy pipeline. F1 maintained or improved. No regression.
 
-- [ ] Design code-review detector specs (scope-creep, inconsistency, intent-extractor)
-- [ ] Build diff-intake COG (parse unified diff → ConversationSnapshot equivalent)
-- [ ] Hand-craft 20 PR corpus entries with labeled findings
-- [ ] Competition: which architecture variant wins on code review?
-- [ ] Document: does domain-adaptive selection generalize to code domain?
+### Phase 10: Cross-Domain — Code Review Deployment
 
-### Phase 11: Architecture Evolution
+- [ ] 10.1 Adapt pipeline for code review conversations (PR reviews, architecture discussions)
+- [ ] 10.2 Generate code-review-specific corpus (50+ conversations)
+- [ ] 10.3 Calibrate detector thresholds for code review domain (Forge-evolve FIS configs)
+- [ ] 10.4 Deploy code review mode alongside conversation mode
 
-Use AIP Forge to evolve not just parameters but pipeline composition.
+**Exit:** CereBRO handles both conversational and code review reasoning detection.
 
-- [ ] Vary: Layer 0 inclusion, Layer 2 detector set, Layer 3 thresholds, feedback on/off
-- [ ] Competition: domain-adaptive variants per domain (modern, classical, technical, code)
-- [ ] Pareto frontier: F1 vs latency vs stage count
-- [ ] Graduate winners to GEARS manifests
+### Phase 11: Forge Evolution + Online Learning
+
+This is where fugo's P3.2 (Forge integration) and P2 (bandit learning) pay off.
+
+- [ ] 11.1 Forge-evolve ALL fugo FIS configs on 500+ corpus (offline optimization)
+- [ ] 11.2 Compare Forge-evolved vs hand-tuned FIS on held-out test set
+- [ ] 11.3 Activate fugo bandit online learning in production — FIS rule weights tune themselves
+- [ ] 11.4 Measure F1 improvement over 30 days of online learning
+- [ ] 11.5 EDD gate: verify no drift, no degradation, bandit convergence
+
+**Exit:** CereBRO self-improving in production. F1 trend positive over 30 days. Bandit converged.
 
 ## Deferred / Not Planned
 
 - **ML Enricher revival** — PURE pipeline wins. ML archived. Revisit only if dedicated GPU available.
 - **Real-time streaming** — Pipeline is batch (per-conversation). Streaming adds complexity without proportional value at current scale.
 - **Multi-language** — Language Detector exists but all detectors are English-only. Defer until non-English corpus exists.
-- **Containerization** — Prove the loop locally first. Deploy to Proxmox LXC only when nightly loop is stable for 30 days.
 
 ## Code Stats
 
 ```
 Pipeline modules:   50 files
 COG binaries:       10
-Tests:              262
-Corpus entries:     122 (full-v3)
+Tests:              273 (incl. 11 cerebro-hook)
+Corpus entries:     197 (full-v3 + Genesis imports)
 Forge cycles:       2 complete
 Nightly scripts:    9
+Production:         LXC deployed, cerebro-hook live (536us)
 ```
