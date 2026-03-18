@@ -30,6 +30,13 @@ const (
 	// LowConfidenceThreshold is the per-finding confidence level below which
 	// a PTS signal is raised.
 	LowConfidenceThreshold = 0.5
+
+	// InjectConfidenceThreshold is the per-finding confidence level at or above
+	// which a detection signal is injected into PTS via POST /inject.
+	InjectConfidenceThreshold = 0.6
+
+	// injectPTSTimeout is the HTTP timeout for PTS /inject calls.
+	injectPTSTimeout = 3 * time.Second
 )
 
 // ptsSignalRequest is the payload for POST /cog/signal.
@@ -37,6 +44,11 @@ type ptsSignalRequest struct {
 	Cog         string   `json:"cog"`
 	Observation string   `json:"observation"`
 	Artifacts   []string `json:"artifacts"`
+}
+
+// ptsInjectRequest is the payload for POST /inject.
+type ptsInjectRequest struct {
+	Text string `json:"text"`
 }
 
 // PTSClient sends cog signals to PTS.
@@ -188,6 +200,69 @@ func maybeSendPTSSignals(result *PipelineResult, endpoint string) {
 	for _, sig := range signals {
 		s := sig // capture loop variable
 		go client.Send(context.Background(), s.Cog, s.Observation, s.Artifacts)
+	}
+}
+
+// SendInject POSTs a plain-text detection signal to PTS /inject.
+// This method is intended to be called as a goroutine (fire-and-forget).
+// Errors are logged with Warn level but never propagated.
+func (c *PTSClient) SendInject(ctx context.Context, text string) {
+	body := ptsInjectRequest{Text: text}
+
+	payload, err := json.Marshal(body)
+	if err != nil {
+		log.Printf("[pts-client] inject marshal error: %v", err)
+		return
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint+"/inject", bytes.NewReader(payload))
+	if err != nil {
+		log.Printf("[pts-client] inject request build error: %v", err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		log.Printf("[pts-client] inject send error: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		log.Printf("[pts-client] inject unexpected status %d", resp.StatusCode)
+	}
+}
+
+// maybeInjectPTSFindings fires a goroutine for each finding with confidence >= InjectConfidenceThreshold,
+// POSTing the detection text to PTS /inject. It is a no-op when endpoint is empty. Never blocks.
+func maybeInjectPTSFindings(result *PipelineResult, endpoint string) {
+	if endpoint == "" || result == nil || result.Rejected {
+		return
+	}
+	convID := ""
+	if result.Report != nil {
+		convID = result.Report.GetConversationId()
+	}
+	client := &PTSClient{
+		endpoint: endpoint,
+		timeout:  injectPTSTimeout,
+		http:     &http.Client{Timeout: injectPTSTimeout},
+	}
+	for _, f := range result.Findings {
+		if f.GetConfidence() < InjectConfidenceThreshold {
+			continue
+		}
+		cogName := f.GetDetectorName()
+		if cogName == "" {
+			cogName = findingTypeName(f.GetFindingType())
+		}
+		text := fmt.Sprintf(
+			"CereBRO COG signal: %s detected %s (conf=%.2f) in conversation %s",
+			cogName, findingTypeName(f.GetFindingType()), f.GetConfidence(), convID,
+		)
+		t := text // capture loop variable
+		go client.SendInject(context.Background(), t)
 	}
 }
 

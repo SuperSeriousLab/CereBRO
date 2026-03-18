@@ -188,7 +188,7 @@ func processEntry(
 	domainCtx := sophrimClient.FetchDomainContext(ctx, conversationSummary(snap))
 
 	// Run adaptive pipeline.
-	result, err := pipeline.RunAdaptive(snap, domainCtx)
+	result, err := pipeline.RunAdaptive(snap, domainCtx, "")
 	if err != nil {
 		log.Printf("cerebro-batch: pipeline error for entry %q: %v", entryID, err)
 		sum.Errors++

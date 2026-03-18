@@ -32,7 +32,10 @@ import (
 // classical-text detector adjustments (ScopeGuard thresholds, SkipAnchoring,
 // Calibrator.MinCertaintyWords) are always in effect when pre-cortex runs on
 // classical text.
-func RunAdaptive(snap *reasoningv1.ConversationSnapshot, domain *DomainContext) (*PipelineResult, error) {
+//
+// ptsEndpoint (optional) enables fire-and-forget PTS anomaly signals. Pass ""
+// to disable. Mirrors the PTSEndpoint field on PipelineConfig.
+func RunAdaptive(snap *reasoningv1.ConversationSnapshot, domain *DomainContext, ptsEndpoint string) (*PipelineResult, error) {
 	if snap == nil {
 		return nil, errors.New("RunAdaptive: snap must not be nil")
 	}
@@ -49,6 +52,9 @@ func RunAdaptive(snap *reasoningv1.ConversationSnapshot, domain *DomainContext) 
 	// Wire domain context so applyDomainContext inside Run can adjust
 	// detector thresholds for classical vocabulary characteristics.
 	cfg.DomainContext = domain
+
+	// Wire PTS endpoint for fire-and-forget anomaly signals.
+	cfg.PTSEndpoint = ptsEndpoint
 
 	result := Run(snap, cfg)
 	return result, nil

@@ -330,6 +330,8 @@ func Run(snap *reasoningv1.ConversationSnapshot, cfg PipelineConfig) *PipelineRe
 	// Report zero-score, low-confidence, or metacognitive-review-flagged results
 	// to the Problem Tracking System for human triage.
 	maybeSendPTSSignals(result, cfg.PTSEndpoint)
+	// Inject high-confidence findings (>= 0.6) into PTS via POST /inject.
+	maybeInjectPTSFindings(result, cfg.PTSEndpoint)
 
 	// Stage 11: Training data log event (optional — zero Logger = no-op).
 	// Emits one structured event per Run() with full pipeline telemetry for

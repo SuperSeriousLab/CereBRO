@@ -84,7 +84,7 @@ func TestRunAdaptive_classicalHighConfidence(t *testing.T) {
 		t.Errorf("classical confidence=0.8: want E-pre-cortex, got %s", name)
 	}
 
-	result, err := RunAdaptive(snap, dc)
+	result, err := RunAdaptive(snap, dc, "")
 	if err != nil {
 		t.Fatalf("RunAdaptive error: %v", err)
 	}
@@ -113,7 +113,7 @@ func TestRunAdaptive_modernHighConfidence(t *testing.T) {
 		t.Errorf("modern confidence=0.9: want D-inhibitor-only, got %s", name)
 	}
 
-	result, err := RunAdaptive(snap, dc)
+	result, err := RunAdaptive(snap, dc, "")
 	if err != nil {
 		t.Fatalf("RunAdaptive error: %v", err)
 	}
@@ -136,7 +136,7 @@ func TestRunAdaptive_nilDomain(t *testing.T) {
 		t.Errorf("nil domain: want D-inhibitor-only, got %s", name)
 	}
 
-	result, err := RunAdaptive(snap, nil)
+	result, err := RunAdaptive(snap, nil, "")
 	if err != nil {
 		t.Fatalf("RunAdaptive error: %v", err)
 	}
@@ -165,7 +165,7 @@ func TestRunAdaptive_classicalLowConfidence(t *testing.T) {
 		t.Errorf("classical confidence=0.3: want D-inhibitor-only, got %s", name)
 	}
 
-	result, err := RunAdaptive(snap, dc)
+	result, err := RunAdaptive(snap, dc, "")
 	if err != nil {
 		t.Fatalf("RunAdaptive error: %v", err)
 	}
@@ -180,7 +180,7 @@ func TestRunAdaptive_classicalLowConfidence(t *testing.T) {
 
 // TestRunAdaptive_nilSnap verifies a nil snapshot returns an error.
 func TestRunAdaptive_nilSnap(t *testing.T) {
-	_, err := RunAdaptive(nil, nil)
+	_, err := RunAdaptive(nil, nil, "")
 	if err == nil {
 		t.Fatal("expected error for nil snap, got nil")
 	}
@@ -235,7 +235,7 @@ func TestRunAdaptive_ComparisonTable(t *testing.T) {
 
 	// Modern: adaptive should select D-inhibitor-only; compare with standalone D.
 	for _, entry := range modernEntries {
-		adaptiveResult, err := RunAdaptive(entry.Snap, nil) // nil → modern default
+		adaptiveResult, err := RunAdaptive(entry.Snap, nil, "") // nil → modern default
 		if err != nil {
 			t.Fatalf("RunAdaptive modern error: %v", err)
 		}
@@ -258,7 +258,7 @@ func TestRunAdaptive_ComparisonTable(t *testing.T) {
 	eCfgWithDomain.DomainContext = classicalDC
 
 	for _, entry := range classicalEntries {
-		adaptiveResult, err := RunAdaptive(entry.Snap, classicalDC)
+		adaptiveResult, err := RunAdaptive(entry.Snap, classicalDC, "")
 		if err != nil {
 			t.Fatalf("RunAdaptive classical error: %v", err)
 		}
@@ -298,7 +298,7 @@ func TestRunAdaptive_ModernF1Regression(t *testing.T) {
 
 	var totalTP, totalFP, totalFN int
 	for _, entry := range entries {
-		result, err := RunAdaptive(entry.Snap, nil)
+		result, err := RunAdaptive(entry.Snap, nil, "")
 		if err != nil {
 			t.Fatalf("RunAdaptive error: %v", err)
 		}

@@ -192,7 +192,7 @@ func analyzeHandler(sophrimClient *pipeline.SophrimClient, ptsEndpoint string) h
 		}
 
 		start := time.Now()
-		result, err := pipeline.RunAdaptive(&snap, domain)
+		result, err := pipeline.RunAdaptive(&snap, domain, ptsEndpoint)
 		elapsed := time.Since(start)
 
 		if err != nil {
