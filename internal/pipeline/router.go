@@ -23,6 +23,7 @@ const (
 	DetectorSustainedConvictionWide Detector = "sustained-conviction-wide-detector"
 	DetectorUnderevidencedClaims    Detector = "underevidenced-claims"
 	DetectorNegativeClaim         Detector = "negative-claim-confidence"
+	DetectorAssumptionSurfacer    Detector = "assumption-surfacer-detector"
 )
 
 // RouterConfig holds activation thresholds.
@@ -262,6 +263,17 @@ func Route(snap *reasoningv1.ConversationSnapshot, cfg RouterConfig) RoutingDeci
 		if strings.ToLower(t.GetSpeaker()) == "assistant" {
 			activated = append(activated, DetectorNegativeClaim)
 			reasons = append(reasons, "assistant turns present — checking negative-claim high-confidence signal")
+			break
+		}
+	}
+
+	// AssumptionSurfacer: activate when conversation has ≥ 1 assistant turn.
+	// Phase 9, Tier2_Structural — detects high-confidence claims without stated premises.
+	// Fires UNSUPPORTED_CONCLUSION when assumption_ratio > 0.70 and claim_phrases >= 2.
+	for _, t := range turns {
+		if strings.ToLower(t.GetSpeaker()) == "assistant" {
+			activated = append(activated, DetectorAssumptionSurfacer)
+			reasons = append(reasons, "assistant turns present — checking for unstated assumption chains")
 			break
 		}
 	}

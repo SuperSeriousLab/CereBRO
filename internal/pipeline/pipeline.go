@@ -49,6 +49,7 @@ type PipelineConfig struct {
 	SustainedConvictionWide  SustainedConvictionConfig      // Tier 1: sustained conviction wider-window variant (dccd40d7, v7: window=7, threshold=0.338)
 	UnderevidencedClaims     UnderevidencedClaimsConfig     // Tier 1: evidence-to-positive-claim ratio detector (gen10_89)
 	NegativeClaim            NegativeClaimConfig            // Tier 2: MaxMV(negative-direction claims) > 0.45 (gen0_93)
+	AssumptionSurfacer       AssumptionSurfacerConfig       // Phase 9, Tier2_Structural: unstated assumption chain detector
 	DetectorFuzzy       *DetectorFuzzy            // L2 fuzzy severity (nil = crisp fallback)
 	FuzzyUrgency        *FuzzyUrgency             // L1 fuzzy urgency (nil = crisp fallback)
 	Arbitrator          *CrossLayerArbitrator     // Cross-layer arbitration (nil = passthrough)
@@ -120,6 +121,7 @@ func DefaultPipelineConfig() PipelineConfig {
 		SustainedConvictionWide: DefaultSustainedConvictionWideConfig(),
 		UnderevidencedClaims: DefaultUnderevidencedClaimsConfig(),
 		NegativeClaim:        DefaultNegativeClaimConfig(),
+		AssumptionSurfacer:   DefaultAssumptionSurfacerConfig(),
 	}
 }
 
@@ -627,6 +629,12 @@ func buildDetectorMap(cfg PipelineConfig) map[Detector]DetectorFunc {
 	// (NegativeClaimHighConfidenceSignal). Tier2_Structural.
 	m[DetectorNegativeClaim] = func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
 		return DetectNegativeClaimHighConfidence(snap, cfg.NegativeClaim)
+	}
+
+	// AssumptionSurfacer: fires UNSUPPORTED_CONCLUSION when assumption_ratio > 0.70
+	// and claim_phrases >= 2. Phase 9, Tier2_Structural.
+	m[DetectorAssumptionSurfacer] = func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
+		return DetectAssumptionSurfacer(snap, cfg.AssumptionSurfacer)
 	}
 
 	return m

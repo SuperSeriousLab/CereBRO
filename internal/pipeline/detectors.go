@@ -3030,3 +3030,136 @@ func DetectNegativeClaimHighConfidence(snap *reasoningv1.ConversationSnapshot, c
 		DetectorName:  "negative-claim-confidence",
 	}
 }
+
+// ============================================================
+// AssumptionSurfacer Detector (Phase 9, Tier2_Structural)
+// ============================================================
+//
+// Detects when an AI agent makes high-confidence assertions whose supporting
+// premises were never stated in prior turns — arguing from unstated assumptions.
+// This is a structural reasoning flaw where confidence is unjustified because
+// the foundation is hidden.
+//
+// Signal logic:
+//   - Count "claim phrases" (high-confidence assertions): "clearly", "obviously", etc.
+//   - Count "premise phrases" (stated foundations): "because", "since", "given that", etc.
+//   - assumption_ratio = claim_phrases / (claim_phrases + premise_phrases + 1.0)
+//   - Fire when assumption_ratio > ClaimRatioThreshold (default 0.75) AND claim_phrases >= MinClaimPhrases (default 2)
+//   - Confidence = 0.5 + 0.5 * (assumption_ratio - threshold) / (1.0 - threshold)
+//   - Severity: HIGH if ratio > 0.85, MEDIUM if > threshold
+
+// AssumptionSurfacerConfig holds parameters for the AssumptionSurfacer detector.
+type AssumptionSurfacerConfig struct {
+	// ClaimRatioThreshold: minimum assumption ratio to fire. Default: 0.75.
+	// Spec genesis default was 0.70; raised to 0.75 to avoid FPs on short
+	// high-confidence conversations where 3 claims alone push the ratio to ~0.75.
+	ClaimRatioThreshold float64
+	// MinClaimPhrases: minimum claim phrase count required to fire. Default: 2.
+	MinClaimPhrases int
+}
+
+// DefaultAssumptionSurfacerConfig returns the default configuration.
+func DefaultAssumptionSurfacerConfig() AssumptionSurfacerConfig {
+	return AssumptionSurfacerConfig{
+		ClaimRatioThreshold: 0.75,
+		MinClaimPhrases:     2,
+	}
+}
+
+// assumptionClaimPhrases are high-confidence assertion markers.
+var assumptionClaimPhrases = []string{
+	"clearly", "obviously", "definitely", "it is known that",
+	"as we know", "undeniably", "certainly", "it follows that",
+	"this means", "therefore", "thus", "hence", "consequently",
+}
+
+// assumptionPremisePhrases are stated-foundation markers.
+var assumptionPremisePhrases = []string{
+	"because", "since", "given that", "as shown by",
+	"evidence shows", "research indicates", "studies show",
+	"according to", "based on", "the data shows",
+}
+
+// assumptionCountPhrases counts occurrences of any phrase from the list in the text.
+func assumptionCountPhrases(lower string, phrases []string) int {
+	count := 0
+	for _, p := range phrases {
+		idx := 0
+		for {
+			i := strings.Index(lower[idx:], p)
+			if i < 0 {
+				break
+			}
+			count++
+			idx += i + len(p)
+		}
+	}
+	return count
+}
+
+// DetectAssumptionSurfacer fires UNSUPPORTED_CONCLUSION when the assistant makes
+// high-confidence claims disproportionate to stated premises.
+// Implements Phase 9 Tier2_Structural — assumption-surfacer-detector.
+func DetectAssumptionSurfacer(snap *reasoningv1.ConversationSnapshot, cfg AssumptionSurfacerConfig) *reasoningv1.CognitiveAssessment {
+	if snap == nil {
+		return nil
+	}
+
+	totalClaims := 0
+	totalPremises := 0
+	var relevantTurns []uint32
+
+	for _, turn := range snap.GetTurns() {
+		if turn.GetSpeaker() != "assistant" {
+			continue
+		}
+		lower := strings.ToLower(turn.GetRawText())
+		claims := assumptionCountPhrases(lower, assumptionClaimPhrases)
+		premises := assumptionCountPhrases(lower, assumptionPremisePhrases)
+		if claims > 0 {
+			totalClaims += claims
+			totalPremises += premises
+			relevantTurns = append(relevantTurns, turn.GetTurnNumber())
+		}
+	}
+
+	if totalClaims < cfg.MinClaimPhrases {
+		return nil
+	}
+
+	ratio := float64(totalClaims) / (float64(totalClaims) + float64(totalPremises) + 1.0)
+
+	if ratio <= cfg.ClaimRatioThreshold {
+		return nil
+	}
+
+	// Confidence: 0.5 at threshold, 1.0 at ratio=1.0.
+	remaining := 1.0 - cfg.ClaimRatioThreshold
+	if remaining <= 0 {
+		remaining = 1.0
+	}
+	confidence := 0.5 + 0.5*(ratio-cfg.ClaimRatioThreshold)/remaining
+	if confidence > 1.0 {
+		confidence = 1.0
+	}
+
+	severity := reasoningv1.FindingSeverity_WARNING
+	if ratio > 0.85 {
+		severity = reasoningv1.FindingSeverity_CRITICAL
+	}
+
+	explanation := "AssumptionSurfacer: claim_phrases=" + uintToString(uint32(totalClaims)) +
+		" premise_phrases=" + uintToString(uint32(totalPremises)) +
+		" assumption_ratio=" + formatFloat(ratio) +
+		" > threshold=" + formatFloat(cfg.ClaimRatioThreshold) +
+		". High-confidence claims lack stated premises — unstated assumption chain detected."
+
+	return &reasoningv1.CognitiveAssessment{
+		FindingType:   reasoningv1.FindingType_UNSUPPORTED_CONCLUSION,
+		Severity:      severity,
+		Explanation:   explanation,
+		RelevantTurns: relevantTurns,
+		Confidence:    confidence,
+		DetectorName:  "assumption-surfacer-detector",
+	}
+}

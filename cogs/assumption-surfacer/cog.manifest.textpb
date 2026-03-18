@@ -1,0 +1,73 @@
+# Assumption Surfacer COG manifest.
+# PURE deterministic — detects unstated assumption chains in assistant turns.
+# Fires UNSUPPORTED_CONCLUSION when assumption_ratio > 0.70 and claim_phrases >= 2.
+# Phase 9, Tier2_Structural — Layer 2 (Cortical Specialists / Detectors).
+
+name: "assumption-surfacer-detector"
+version: "0.1.0"
+language: GO
+determinism: PURE
+
+ports {
+  name: "conversation_snapshot"
+  direction: IN
+  message_type: "cog.reasoning.v1.ConversationSnapshot"
+}
+
+ports {
+  name: "assessment"
+  direction: OUT
+  message_type: "cog.reasoning.v1.CognitiveAssessment"
+}
+
+ports {
+  name: "_error"
+  direction: OUT
+  message_type: "cog.core.v1.ErrorEvent"
+}
+
+contracts {
+  packages: "cog.reasoning.v1"
+  packages: "cog.core.v1"
+  proto_hash: "sha256:pending"
+}
+
+config {
+  fields {
+    name: "claim_ratio_threshold"
+    type: DOUBLE
+    default_value: "0.75"
+    required: false
+    description: "Minimum assumption ratio to fire (claim_phrases / (claim_phrases + premise_phrases + 1.0))"
+    min_value: "0.0"
+    max_value: "1.0"
+    evolvable: true
+  }
+  fields {
+    name: "min_claim_phrases"
+    type: UINT32
+    default_value: "2"
+    required: false
+    description: "Minimum claim phrase count required before firing"
+    min_value: "1"
+    max_value: "20"
+    evolvable: true
+  }
+}
+
+description: "Detects unstated assumption chains — fires UNSUPPORTED_CONCLUSION when high-confidence claims lack stated premises. assumption_ratio = claim_phrases / (claim_phrases + premise_phrases + 1.0) > 0.70. Phase 9, Tier2_Structural."
+
+tags: "cognitive"
+tags: "cerebro"
+tags: "tier2-structural"
+tags: "pure"
+tags: "phase9"
+
+lineage {
+  level: HAND_CRAFTED
+  genesis_rule: "phase9-assumption-surfacer"
+  source_corpus: "full-v4.ndjson"
+  fitness: 0.0
+  precision: 0.0
+  recall: 0.0
+}
