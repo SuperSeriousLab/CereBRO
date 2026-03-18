@@ -1,0 +1,83 @@
+# Evidence Asymmetry COG manifest.
+# PURE deterministic — combined gen4_78 (positive claims under-evidenced) +
+# gen4_86 (negative claims over-evidenced) evidence grounding asymmetry detector.
+# Fires CONFIDENCE_MISCALIBRATION when ratio > 1.5.
+# Layer 2, Cortical Specialists — evidence density analysis.
+
+name: "evidence-asymmetry-detector"
+version: "0.1.0"
+language: GO
+determinism: PURE
+
+ports {
+  name: "conversation_snapshot"
+  direction: IN
+  message_type: "cog.reasoning.v1.ConversationSnapshot"
+}
+
+ports {
+  name: "cognitive_assessment"
+  direction: OUT
+  message_type: "cog.reasoning.v1.CognitiveAssessment"
+}
+
+ports {
+  name: "_error"
+  direction: OUT
+  message_type: "cog.core.v1.ErrorEvent"
+}
+
+contracts {
+  packages: "cog.reasoning.v1"
+  packages: "cog.core.v1"
+  proto_hash: "sha256:pending"
+}
+
+config {
+  fields {
+    name: "miscalibration_threshold"
+    type: DOUBLE
+    default_value: "1.5"
+    required: false
+    description: "Ratio above which CONFIDENCE_MISCALIBRATION fires (neg_avg / pos_avg)"
+    min_value: "1.0"
+    max_value: "5.0"
+    evolvable: true
+  }
+  fields {
+    name: "borderline_threshold"
+    type: DOUBLE
+    default_value: "1.0"
+    required: false
+    description: "Lower bound of the borderline zone — ratio between this and miscalibration_threshold is CAUTION"
+    min_value: "0.5"
+    max_value: "2.0"
+    evolvable: true
+  }
+  fields {
+    name: "min_assistant_turns"
+    type: UINT32
+    default_value: "2"
+    required: false
+    description: "Minimum number of assistant turns required before detection runs"
+    min_value: "1"
+    max_value: "10"
+    evolvable: false
+  }
+}
+
+description: "Detects evidence grounding asymmetry between positive and negative claims — fires CONFIDENCE_MISCALIBRATION when negative claims are better-evidenced than positive claims by more than 1.5×"
+
+tags: "cognitive"
+tags: "cerebro"
+tags: "evidence"
+tags: "calibration"
+tags: "pure"
+tags: "tier2"
+
+lineage {
+  level: HAND_WRITTEN
+}
+
+genesis_rules: "gen4_78"
+genesis_rules: "gen4_86"
