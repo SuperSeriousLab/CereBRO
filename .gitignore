@@ -27,3 +27,4 @@ Thumbs.db
 # Generation data (large, ephemeral)
 data/generation/logs/
 data/generation/output/
+cerebro-server
