@@ -52,6 +52,7 @@ type PipelineConfig struct {
 	AssumptionSurfacer       AssumptionSurfacerConfig       // Phase 9, Tier2_Structural: unstated assumption chain detector
 	CircularReasoning        CircularReasoningConfig        // Phase 9, Tier2_Structural: self-referential justification detector
 	EvidenceQuality          EvidenceQualityConfig          // Phase 9, Tier2_Structural: anecdotal vs empirical evidence detector
+	StatusQuoBias            StatusQuoBiasConfig            // Phase 9, Tier2_Structural: asymmetric change-burden detector
 	DetectorFuzzy       *DetectorFuzzy            // L2 fuzzy severity (nil = crisp fallback)
 	FuzzyUrgency        *FuzzyUrgency             // L1 fuzzy urgency (nil = crisp fallback)
 	Arbitrator          *CrossLayerArbitrator     // Cross-layer arbitration (nil = passthrough)
@@ -126,6 +127,7 @@ func DefaultPipelineConfig() PipelineConfig {
 		AssumptionSurfacer:   DefaultAssumptionSurfacerConfig(),
 		CircularReasoning:    DefaultCircularReasoningConfig(),
 		EvidenceQuality:      DefaultEvidenceQualityConfig(),
+		StatusQuoBias:        DefaultStatusQuoBiasConfig(),
 	}
 }
 
@@ -651,6 +653,12 @@ func buildDetectorMap(cfg PipelineConfig) map[Detector]DetectorFunc {
 	// and anecdotal >= 2, or high_conf_anecdote_turns >= 2. Phase 9, Tier2_Structural.
 	m[DetectorEvidenceQuality] = func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
 		return DetectEvidenceQuality(snap, cfg.EvidenceQuality)
+	}
+
+	// StatusQuoBias: fires STATUS_QUO_BIAS when avg_bias_score > 0.65 and
+	// (status_quo + change_burden) >= 3. Phase 9, Tier2_Structural.
+	m[DetectorStatusQuoBias] = func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
+		return DetectStatusQuoBias(snap, cfg.StatusQuoBias)
 	}
 
 	return m

@@ -1,0 +1,73 @@
+# Status-Quo Bias COG manifest.
+# PURE deterministic — detects asymmetric change-burden framing in assistant turns.
+# Fires STATUS_QUO_BIAS when avg_bias_score > 0.65 and (status_quo + change_burden) >= 3.
+# Phase 9, Tier2_Structural — Layer 2 (Cortical Specialists / Detectors).
+
+name: "status-quo-bias-detector"
+version: "0.1.0"
+language: GO
+determinism: PURE
+
+ports {
+  name: "conversation_snapshot"
+  direction: IN
+  message_type: "cog.reasoning.v1.ConversationSnapshot"
+}
+
+ports {
+  name: "assessment"
+  direction: OUT
+  message_type: "cog.reasoning.v1.CognitiveAssessment"
+}
+
+ports {
+  name: "_error"
+  direction: OUT
+  message_type: "cog.core.v1.ErrorEvent"
+}
+
+contracts {
+  packages: "cog.reasoning.v1"
+  packages: "cog.core.v1"
+  proto_hash: "sha256:pending"
+}
+
+config {
+  fields {
+    name: "bias_score_threshold"
+    type: DOUBLE
+    default_value: "0.65"
+    required: false
+    description: "Minimum average bias score across scored assistant turns to fire"
+    min_value: "0.0"
+    max_value: "1.0"
+    evolvable: true
+  }
+  fields {
+    name: "min_match_count"
+    type: UINT32
+    default_value: "3"
+    required: false
+    description: "Minimum total status-quo + change-burden phrase count before firing"
+    min_value: "1"
+    max_value: "100"
+    evolvable: true
+  }
+}
+
+description: "Detects status-quo bias — fires STATUS_QUO_BIAS when the assistant systematically frames the status quo as the default-good and change as requiring extra justification. avg_bias_score > 0.65 and (status_quo + change_burden) >= 3. Phase 9, Tier2_Structural."
+
+tags: "cognitive"
+tags: "cerebro"
+tags: "tier2-structural"
+tags: "pure"
+tags: "phase9"
+
+lineage {
+  level: HAND_CRAFTED
+  genesis_rule: "phase9-status-quo-bias"
+  source_corpus: "full-v4.ndjson"
+  fitness: 0.0
+  precision: 0.0
+  recall: 0.0
+}

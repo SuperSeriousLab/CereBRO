@@ -3612,3 +3612,138 @@ func DetectEvidenceQuality(snap *reasoningv1.ConversationSnapshot, cfg EvidenceQ
 		DetectorName:  "evidence-quality-detector",
 	}
 }
+
+// ============================================================
+// Status-Quo Bias Detector
+// ============================================================
+
+// StatusQuoBiasConfig holds tunable parameters for the status-quo bias detector.
+type StatusQuoBiasConfig struct {
+	BiasScoreThreshold float64 // default 0.65
+	MinMatchCount      int     // default 3
+}
+
+// DefaultStatusQuoBiasConfig returns the default configuration.
+func DefaultStatusQuoBiasConfig() StatusQuoBiasConfig {
+	return StatusQuoBiasConfig{
+		BiasScoreThreshold: 0.65,
+		MinMatchCount:      3,
+	}
+}
+
+// statusQuoPreferencePhrases signal systematic preference for the current state.
+var statusQuoPreferencePhrases = []string{
+	"we've always", "traditionally", "as it is", "the current approach",
+	"stick with", "keep the current", "don't change", "if it ain't broke",
+	"maintain the status quo", "better safe than sorry", "proven approach",
+	"established practice", "time-tested", "tried and true", "don't fix what",
+	"leave it as",
+}
+
+// statusQuoChangeBurdenPhrases signal placing asymmetric burden of proof on change.
+var statusQuoChangeBurdenPhrases = []string{
+	"why change", "what's wrong with", "no reason to change", "seems unnecessary",
+	"do we really need to", "is it worth changing", "why not keep",
+	"change for the sake of change", "risk of changing", "disruption",
+	"overhead of changing",
+}
+
+// statusQuoChangePositivePhrases are counter-signals that reduce the bias score.
+var statusQuoChangePositivePhrases = []string{
+	"we should update", "time to change", "let's improve", "better approach",
+	"migration path", "upgrade", "new solution", "replace with",
+	"modernize", "refactor",
+}
+
+// statusQuoBiasCountPhrases counts how many phrases from the list appear in the text.
+func statusQuoBiasCountPhrases(lower string, phrases []string) int {
+	count := 0
+	for _, p := range phrases {
+		if strings.Contains(lower, p) {
+			count++
+		}
+	}
+	return count
+}
+
+// DetectStatusQuoBias fires STATUS_QUO_BIAS when the assistant systematically
+// frames the status quo as the default-good and change as requiring extra
+// justification — asymmetric argument burden.
+// Implements Phase 9 Tier2_Structural — status-quo-bias-detector.
+func DetectStatusQuoBias(snap *reasoningv1.ConversationSnapshot, cfg StatusQuoBiasConfig) *reasoningv1.CognitiveAssessment {
+	if snap == nil {
+		return nil
+	}
+
+	totalStatusQuo := 0
+	totalChangeBurden := 0
+	totalChangePositive := 0
+	biasScoreSum := 0.0
+	scoredTurns := 0
+	var relevantTurns []uint32
+
+	for _, turn := range snap.GetTurns() {
+		if turn.GetSpeaker() != "assistant" {
+			continue
+		}
+		text := strings.TrimSpace(turn.GetRawText())
+		if text == "" {
+			continue
+		}
+		lower := strings.ToLower(text)
+
+		sq := statusQuoBiasCountPhrases(lower, statusQuoPreferencePhrases)
+		cb := statusQuoBiasCountPhrases(lower, statusQuoChangeBurdenPhrases)
+		cp := statusQuoBiasCountPhrases(lower, statusQuoChangePositivePhrases)
+
+		totalStatusQuo += sq
+		totalChangeBurden += cb
+		totalChangePositive += cp
+
+		// Only score turns that have at least one matched phrase.
+		if sq+cb+cp > 0 {
+			biasScore := float64(sq+cb) / (float64(sq+cb+cp) + 1.0)
+			biasScoreSum += biasScore
+			scoredTurns++
+			relevantTurns = append(relevantTurns, turn.GetTurnNumber())
+		}
+	}
+
+	if scoredTurns == 0 {
+		return nil
+	}
+
+	avgBiasScore := biasScoreSum / float64(scoredTurns)
+	totalBiasMatches := totalStatusQuo + totalChangeBurden
+
+	if avgBiasScore <= cfg.BiasScoreThreshold || totalBiasMatches < cfg.MinMatchCount {
+		return nil
+	}
+
+	// Confidence: 0.5 + 0.5 * (avg_bias_score - threshold) / (1.0 - threshold), capped at 1.0.
+	rangeFraction := (avgBiasScore - cfg.BiasScoreThreshold) / (1.0 - cfg.BiasScoreThreshold)
+	confidence := 0.5 + 0.5*rangeFraction
+	if confidence > 1.0 {
+		confidence = 1.0
+	}
+
+	severity := reasoningv1.FindingSeverity_WARNING
+	if avgBiasScore > 0.85 {
+		severity = reasoningv1.FindingSeverity_CRITICAL
+	}
+
+	explanation := "StatusQuoBias: avg_bias_score=" + formatFloat(avgBiasScore) +
+		" status_quo_total=" + uintToString(uint32(totalStatusQuo)) +
+		" change_burden_total=" + uintToString(uint32(totalChangeBurden)) +
+		" change_positive_total=" + uintToString(uint32(totalChangePositive)) +
+		". Asymmetric argument burden — change consistently framed as requiring extra justification."
+
+	return &reasoningv1.CognitiveAssessment{
+		FindingType:   reasoningv1.FindingType_STATUS_QUO_BIAS,
+		Severity:      severity,
+		Explanation:   explanation,
+		RelevantTurns: relevantTurns,
+		Confidence:    confidence,
+		DetectorName:  "status-quo-bias-detector",
+	}
+}

@@ -26,6 +26,7 @@ const (
 	DetectorAssumptionSurfacer    Detector = "assumption-surfacer-detector"
 	DetectorCircularReasoning     Detector = "circular-reasoning-detector"
 	DetectorEvidenceQuality       Detector = "evidence-quality-detector"
+	DetectorStatusQuoBias         Detector = "status-quo-bias-detector"
 )
 
 // RouterConfig holds activation thresholds.
@@ -302,6 +303,17 @@ func Route(snap *reasoningv1.ConversationSnapshot, cfg RouterConfig) RoutingDeci
 		if strings.ToLower(t.GetSpeaker()) == "assistant" {
 			activated = append(activated, DetectorEvidenceQuality)
 			reasons = append(reasons, "assistant turns present — checking for anecdotal evidence in high-confidence claims")
+			break
+		}
+	}
+
+	// StatusQuoBias: activate when conversation has ≥ 1 assistant turn.
+	// Phase 9, Tier2_Structural — detects asymmetric argument burden favouring the status quo.
+	// Fires STATUS_QUO_BIAS when avg_bias_score > 0.65 and (status_quo + change_burden) >= 3.
+	for _, t := range turns {
+		if strings.ToLower(t.GetSpeaker()) == "assistant" {
+			activated = append(activated, DetectorStatusQuoBias)
+			reasons = append(reasons, "assistant turns present — checking for asymmetric change-burden framing")
 			break
 		}
 	}
