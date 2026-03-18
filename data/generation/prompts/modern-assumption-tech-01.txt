@@ -1,0 +1,1 @@
+Generate an architecture review discussion where a senior engineer confidently asserts multiple technical choices — Redis for caching, Postgres over MongoDB, Kubernetes for deployment, gRPC over REST — each stated as obviously correct with minimal justification, while junior team members nod along and adopt each claim without requesting evidence or trade-off analysis.

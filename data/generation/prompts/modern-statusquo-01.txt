@@ -1,0 +1,1 @@
+Generate a team retrospective where every proposed improvement to the development workflow is resisted with "that's not how we do things here", "if it ain't broke don't fix it", and "we've been shipping this way for five years" — without any examination of whether the current approach is actually working well, what the metrics show, or what the proposed change would cost or gain.
