@@ -45,6 +45,8 @@ type PipelineConfig struct {
 	ConceptualAnchoring ConceptualAnchoringConfig // Tier 2: conceptual anchoring detector
 	InheritedPosition   InheritedPositionConfig   // Tier 2: inherited-position detector
 	DetectorFuzzy       *DetectorFuzzy            // L2 fuzzy severity (nil = crisp fallback)
+	FuzzyUrgency        *FuzzyUrgency             // L1 fuzzy urgency (nil = crisp fallback)
+	Arbitrator          *CrossLayerArbitrator     // Cross-layer arbitration (nil = passthrough)
 
 	// Sophrim feedback (Connection A of the Lamarckian Loop).
 	// Set by the caller with metadata from SLR / Sophrim grounding.
@@ -106,6 +108,7 @@ type PipelineResult struct {
 	Consolidated bool                            // true if memory consolidation occurred
 	ConsolidationTrigger cerebrov1.ConsolidationTrigger // what triggered consolidation
 	MLEnrichments []*cerebrov1.MLEnrichment       // nil if ML enricher not enabled
+	Arbitration   *ArbitrationResult              // nil if arbitrator not enabled
 }
 
 // Run executes the full cognitive pipeline on a ConversationSnapshot:
@@ -165,11 +168,8 @@ func Run(snap *reasoningv1.ConversationSnapshot, cfg PipelineConfig) *PipelineRe
 	var adjustments *ThresholdAdjustments
 
 	if cfg.UseNeuromodulation {
-		if cfg.MLEnrichment != nil {
-			gain = AssessUrgencyML(snap, cfg.Urgency, cfg.MLEnrichment)
-		} else {
-			gain = AssessUrgency(snap, cfg.Urgency)
-		}
+		// Use fuzzy urgency if available, otherwise crisp (with optional ML).
+		gain = AssessUrgencyFuzzy(snap, cfg.Urgency, cfg.MLEnrichment, cfg.FuzzyUrgency)
 
 		// Stage 2.5 (computed early so we can apply offsets to detectors)
 		adjustments = Modulate(gain, cfg.Modulator)
@@ -188,10 +188,23 @@ func Run(snap *reasoningv1.ConversationSnapshot, cfg PipelineConfig) *PipelineRe
 
 	// Stage 3: Run activated detectors (with possibly adjusted thresholds).
 	// Detectors are called through a uniform DetectorFunc interface.
+	// When fuzzy urgency is enabled, the gain signal modulates which detectors run:
+	//   Low gain  → only critical detectors (scope-guard, contradiction)
+	//   Med gain  → most detectors (skip expensive variants)
+	//   High gain → all detectors
 	detectors := buildDetectorMap(cfg)
 	var findings []*reasoningv1.CognitiveAssessment
 
+	// Determine gain-based activation level (defaults to High when no fuzzy urgency).
+	gainLevel := GainActivationHigh
+	if cfg.FuzzyUrgency != nil && gain != nil {
+		gainLevel = ClassifyGainActivation(gain.Urgency)
+	}
+
 	for _, det := range routing.Activated {
+		if !ShouldActivateDetector(det, gainLevel) {
+			continue // suppressed by low gain signal
+		}
 		if fn, ok := detectors[det]; ok {
 			if assessment := fn(snap); assessment != nil {
 				findings = append(findings, assessment)
@@ -260,6 +273,13 @@ func Run(snap *reasoningv1.ConversationSnapshot, cfg PipelineConfig) *PipelineRe
 		}
 	}
 
+	// Stage 5.5: Cross-Layer Arbitration (P4.3)
+	// Produces compound pathology assessment from raw findings + inhibition results.
+	var arbitration *ArbitrationResult
+	if cfg.Arbitrator != nil {
+		arbitration = cfg.Arbitrator.Arbitrate(findings, inhibition)
+	}
+
 	result := &PipelineResult{
 		Report:        report,
 		Routing:       routing,
@@ -271,6 +291,7 @@ func Run(snap *reasoningv1.ConversationSnapshot, cfg PipelineConfig) *PipelineRe
 		Feedback:      feedbackResult,
 		Salience:      salienceResult,
 		MLEnrichments: mlEnrichments,
+		Arbitration:   arbitration,
 	}
 
 	// Stage 8: Memory Consolidator (Phase 5)
