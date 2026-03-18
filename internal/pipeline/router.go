@@ -27,6 +27,7 @@ const (
 	DetectorCircularReasoning     Detector = "circular-reasoning-detector"
 	DetectorEvidenceQuality       Detector = "evidence-quality-detector"
 	DetectorStatusQuoBias         Detector = "status-quo-bias-detector"
+	DetectorEntityCoherence       Detector = "entity-coherence-detector"
 )
 
 // RouterConfig holds activation thresholds.
@@ -315,6 +316,22 @@ func Route(snap *reasoningv1.ConversationSnapshot, cfg RouterConfig) RoutingDeci
 			activated = append(activated, DetectorStatusQuoBias)
 			reasons = append(reasons, "assistant turns present — checking for asymmetric change-burden framing")
 			break
+		}
+	}
+
+	// EntityCoherence: activate when conversation has ≥ 3 assistant turns.
+	// Phase 9, Tier2_Structural — detects cross-turn entity description contradictions.
+	// Fires CONTRADICTION when >= 2 entity-contradiction pairs are found across turns.
+	{
+		assistantCount := 0
+		for _, t := range turns {
+			if strings.ToLower(t.GetSpeaker()) == "assistant" {
+				assistantCount++
+			}
+		}
+		if assistantCount >= 3 {
+			activated = append(activated, DetectorEntityCoherence)
+			reasons = append(reasons, "3+ assistant turns present — checking for cross-turn entity description contradictions")
 		}
 	}
 

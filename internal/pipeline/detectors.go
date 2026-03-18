@@ -3747,3 +3747,312 @@ func DetectStatusQuoBias(snap *reasoningv1.ConversationSnapshot, cfg StatusQuoBi
 		DetectorName:  "status-quo-bias-detector",
 	}
 }
+
+// ============================================================
+// Entity Coherence Detector (Phase 9, Tier2_Structural)
+// ============================================================
+
+// EntityCoherenceConfig holds tunable parameters for the entity coherence detector.
+type EntityCoherenceConfig struct {
+	MinContradictions int // default 2: minimum entity-contradiction pairs to fire
+	MinTurnGap        int // default 1: minimum turn gap between contradicting turns (reserved for future use)
+}
+
+// DefaultEntityCoherenceConfig returns the default configuration.
+func DefaultEntityCoherenceConfig() EntityCoherenceConfig {
+	return EntityCoherenceConfig{
+		MinContradictions: 2,
+		MinTurnGap:        1,
+	}
+}
+
+// entityCoherencePositiveDescriptors are adjectives signalling positive entity properties.
+var entityCoherencePositiveDescriptors = []string{
+	"reliable", "stable", "fast", "accurate", "efficient", "robust", "correct",
+	"consistent", "good", "effective", "strong", "sound", "solid", "trustworthy",
+	"dependable",
+}
+
+// entityCoherenceNegativeDescriptors are adjectives signalling negative entity properties.
+var entityCoherenceNegativeDescriptors = []string{
+	"unreliable", "unstable", "slow", "inaccurate", "inefficient", "fragile",
+	"incorrect", "inconsistent", "bad", "ineffective", "weak", "unsound", "broken",
+	"untrustworthy",
+}
+
+// entityCoherenceProxyEntities are fixed lowercase proxy entity strings to track.
+var entityCoherenceProxyEntities = []string{
+	"the system", "the model", "the solution", "this approach", "the algorithm",
+	"the service", "the api",
+}
+
+// entityCoherenceAcknowledgementMarkers signal that the speaker is explicitly
+// acknowledging a change in entity properties — these turns should be skipped.
+var entityCoherenceAcknowledgementMarkers = []string{
+	"but now", "however now", "changed to", "used to be",
+}
+
+// entityCoherenceDescriptorSets holds the positive/negative descriptor sets seen
+// for an entity across turns, indexed by (entity, "pos"/"neg") → set of turn numbers.
+type entityDescriptorRecord struct {
+	posTurns []uint32
+	negTurns []uint32
+}
+
+// entityCoherenceExtractEntities returns a lowercased set of entity strings present
+// in the given text.  It combines proxy entity strings with capitalized multi-word
+// token pairs (CamelCase consecutive capitalised words) found in the text.
+func entityCoherenceExtractEntities(text string) []string {
+	lower := strings.ToLower(text)
+	found := make(map[string]struct{})
+
+	// Proxy entities — simple substring match.
+	for _, proxy := range entityCoherenceProxyEntities {
+		if strings.Contains(lower, proxy) {
+			found[proxy] = struct{}{}
+		}
+	}
+
+	// Capitalized multi-word tokens: two consecutive Title-Cased words
+	// (e.g. "Redis Cache", "Payment Service").
+	words := strings.Fields(text)
+	for i := 0; i < len(words)-1; i++ {
+		w1 := strings.TrimFunc(words[i], func(r rune) bool { return !('A' <= r && r <= 'z') })
+		w2 := strings.TrimFunc(words[i+1], func(r rune) bool { return !('A' <= r && r <= 'z') })
+		if len(w1) >= 2 && len(w2) >= 2 && w1[0] >= 'A' && w1[0] <= 'Z' && w2[0] >= 'A' && w2[0] <= 'Z' {
+			entity := strings.ToLower(w1 + " " + w2)
+			found[entity] = struct{}{}
+		}
+	}
+
+	result := make([]string, 0, len(found))
+	for e := range found {
+		result = append(result, e)
+	}
+	return result
+}
+
+// entityCoherenceDescriptorsInWindow returns which positive and negative
+// descriptors appear within ±5 words of any occurrence of the entity string in
+// the lowercase text.
+func entityCoherenceDescriptorsInWindow(lower, entity string) (pos []string, neg []string) {
+	words := strings.Fields(lower)
+	entityWords := strings.Fields(entity)
+	entityLen := len(entityWords)
+
+	// Find all start positions of entity in the word slice.
+	var matchPositions []int
+	for i := 0; i <= len(words)-entityLen; i++ {
+		match := true
+		for j, ew := range entityWords {
+			if strings.TrimFunc(words[i+j], func(r rune) bool { return r == ',' || r == '.' || r == ';' || r == ':' }) != ew {
+				match = false
+				break
+			}
+		}
+		if match {
+			matchPositions = append(matchPositions, i)
+		}
+	}
+
+	if len(matchPositions) == 0 {
+		return nil, nil
+	}
+
+	const windowSize = 5
+
+	inWindow := func(wordIdx int) bool {
+		for _, pos := range matchPositions {
+			lo := pos - windowSize
+			hi := pos + entityLen - 1 + windowSize
+			if wordIdx >= lo && wordIdx <= hi {
+				return true
+			}
+		}
+		return false
+	}
+
+	posSet := make(map[string]struct{})
+	negSet := make(map[string]struct{})
+
+	for i, w := range words {
+		clean := strings.TrimFunc(w, func(r rune) bool { return r == ',' || r == '.' || r == ';' || r == ':' || r == '!' || r == '?' })
+		if !inWindow(i) {
+			continue
+		}
+		for _, d := range entityCoherencePositiveDescriptors {
+			if clean == d {
+				posSet[d] = struct{}{}
+			}
+		}
+		for _, d := range entityCoherenceNegativeDescriptors {
+			if clean == d {
+				negSet[d] = struct{}{}
+			}
+		}
+	}
+
+	for d := range posSet {
+		pos = append(pos, d)
+	}
+	for d := range negSet {
+		neg = append(neg, d)
+	}
+	return pos, neg
+}
+
+// entityCoherenceIsAcknowledging returns true when the turn text contains an
+// explicit acknowledgement marker — these turns are excluded from contradiction
+// detection.
+func entityCoherenceIsAcknowledging(lower string) bool {
+	for _, marker := range entityCoherenceAcknowledgementMarkers {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+// DetectEntityCoherence fires CONTRADICTION when the same entity is described
+// with contradictory properties (positive vs negative) across different assistant turns.
+// Implements Phase 9 Tier2_Structural — entity-coherence-detector.
+func DetectEntityCoherence(snap *reasoningv1.ConversationSnapshot, cfg EntityCoherenceConfig) *reasoningv1.CognitiveAssessment {
+	if snap == nil {
+		return nil
+	}
+
+	// Gather assistant turns only.
+	type turnData struct {
+		num  uint32
+		text string
+	}
+	var assistantTurns []turnData
+	for _, turn := range snap.GetTurns() {
+		if strings.ToLower(turn.GetSpeaker()) != "assistant" {
+			continue
+		}
+		text := strings.TrimSpace(turn.GetRawText())
+		if text == "" {
+			continue
+		}
+		assistantTurns = append(assistantTurns, turnData{num: turn.GetTurnNumber(), text: text})
+	}
+
+	// Need at least 3 assistant turns for this detector to be meaningful.
+	if len(assistantTurns) < 3 {
+		return nil
+	}
+
+	// Step 1: Collect all entities that appear in >= 2 assistant turns.
+	entityTurnCount := make(map[string]int)
+	for _, td := range assistantTurns {
+		entities := entityCoherenceExtractEntities(td.text)
+		seenInTurn := make(map[string]struct{})
+		for _, e := range entities {
+			if _, already := seenInTurn[e]; !already {
+				entityTurnCount[e]++
+				seenInTurn[e] = struct{}{}
+			}
+		}
+	}
+
+	// Keep only entities seen in >= 2 turns.
+	qualifiedEntities := make(map[string]struct{})
+	for e, cnt := range entityTurnCount {
+		if cnt >= 2 {
+			qualifiedEntities[e] = struct{}{}
+		}
+	}
+
+	if len(qualifiedEntities) == 0 {
+		return nil
+	}
+
+	// Step 2: For each qualified entity, collect (pos/neg) descriptors per turn.
+	// records[entity] → entityDescriptorRecord
+	records := make(map[string]*entityDescriptorRecord)
+	for e := range qualifiedEntities {
+		records[e] = &entityDescriptorRecord{}
+	}
+
+	for _, td := range assistantTurns {
+		lower := strings.ToLower(td.text)
+		if entityCoherenceIsAcknowledging(lower) {
+			continue
+		}
+		for e := range qualifiedEntities {
+			pos, neg := entityCoherenceDescriptorsInWindow(lower, e)
+			if len(pos) > 0 {
+				records[e].posTurns = append(records[e].posTurns, td.num)
+			}
+			if len(neg) > 0 {
+				records[e].negTurns = append(records[e].negTurns, td.num)
+			}
+		}
+	}
+
+	// Step 3: Count contradiction pairs.
+	// An entity has a contradiction if it has BOTH pos and neg turns from DIFFERENT turns.
+	contradictionCount := 0
+	var relevantTurns []uint32
+	turnSet := make(map[uint32]struct{})
+
+	for _, rec := range records {
+		if len(rec.posTurns) == 0 || len(rec.negTurns) == 0 {
+			continue
+		}
+		// Check that at least one pos and one neg turn are different turns.
+		hasGap := false
+		for _, pt := range rec.posTurns {
+			for _, nt := range rec.negTurns {
+				if pt != nt {
+					hasGap = true
+					break
+				}
+			}
+			if hasGap {
+				break
+			}
+		}
+		if hasGap {
+			contradictionCount++
+			for _, pt := range rec.posTurns {
+				turnSet[pt] = struct{}{}
+			}
+			for _, nt := range rec.negTurns {
+				turnSet[nt] = struct{}{}
+			}
+		}
+	}
+
+	if contradictionCount < cfg.MinContradictions {
+		return nil
+	}
+
+	for t := range turnSet {
+		relevantTurns = append(relevantTurns, t)
+	}
+
+	// Confidence: min(0.5 + 0.3 * contradiction_count, 0.95)
+	confidence := 0.5 + 0.3*float64(contradictionCount)
+	if confidence > 0.95 {
+		confidence = 0.95
+	}
+
+	severity := reasoningv1.FindingSeverity_WARNING // MEDIUM (>=2)
+	if contradictionCount >= 4 {
+		severity = reasoningv1.FindingSeverity_CRITICAL // HIGH
+	}
+
+	explanation := "EntityCoherence: contradiction_count=" + uintToString(uint32(contradictionCount)) +
+		". The same entities are described with contradictory properties across turns without acknowledgement."
+
+	return &reasoningv1.CognitiveAssessment{
+		FindingType:   reasoningv1.FindingType_CONTRADICTION,
+		Severity:      severity,
+		Explanation:   explanation,
+		RelevantTurns: relevantTurns,
+		Confidence:    confidence,
+		DetectorName:  "entity-coherence-detector",
+	}
+}

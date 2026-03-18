@@ -53,6 +53,7 @@ type PipelineConfig struct {
 	CircularReasoning        CircularReasoningConfig        // Phase 9, Tier2_Structural: self-referential justification detector
 	EvidenceQuality          EvidenceQualityConfig          // Phase 9, Tier2_Structural: anecdotal vs empirical evidence detector
 	StatusQuoBias            StatusQuoBiasConfig            // Phase 9, Tier2_Structural: asymmetric change-burden detector
+	EntityCoherence          EntityCoherenceConfig          // Phase 9, Tier2_Structural: cross-turn entity description contradiction detector
 	DetectorFuzzy       *DetectorFuzzy            // L2 fuzzy severity (nil = crisp fallback)
 	FuzzyUrgency        *FuzzyUrgency             // L1 fuzzy urgency (nil = crisp fallback)
 	Arbitrator          *CrossLayerArbitrator     // Cross-layer arbitration (nil = passthrough)
@@ -128,6 +129,7 @@ func DefaultPipelineConfig() PipelineConfig {
 		CircularReasoning:    DefaultCircularReasoningConfig(),
 		EvidenceQuality:      DefaultEvidenceQualityConfig(),
 		StatusQuoBias:        DefaultStatusQuoBiasConfig(),
+		EntityCoherence:      DefaultEntityCoherenceConfig(),
 	}
 }
 
@@ -659,6 +661,12 @@ func buildDetectorMap(cfg PipelineConfig) map[Detector]DetectorFunc {
 	// (status_quo + change_burden) >= 3. Phase 9, Tier2_Structural.
 	m[DetectorStatusQuoBias] = func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
 		return DetectStatusQuoBias(snap, cfg.StatusQuoBias)
+	}
+
+	// EntityCoherence: fires CONTRADICTION when >= 2 entities are described with
+	// contradictory properties across different assistant turns. Phase 9, Tier2_Structural.
+	m[DetectorEntityCoherence] = func(snap *reasoningv1.ConversationSnapshot) *reasoningv1.CognitiveAssessment {
+		return DetectEntityCoherence(snap, cfg.EntityCoherence)
 	}
 
 	return m
