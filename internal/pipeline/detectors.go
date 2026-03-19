@@ -304,13 +304,41 @@ type sentenceRecord struct {
 	turn    uint32
 }
 
+// userOverridePrefix is the sentinel prepended to user turns that contain explicit
+// direction-change signals (set by buildSnapshot in the hook). The contradiction
+// detector skips turns with this prefix as contradiction candidates.
+const userOverridePrefix = "[user_override]"
+
+// contradictionMinConfidence is the base minimum confidence required to emit a
+// contradiction finding for a claude_code_session objective. CTO sessions
+// legitimately change direction, so we raise the bar by 0.15 vs. the computed
+// contradictionConfidence (which starts at 0.4 base + overlap*0.3 + kind bonus).
+const contradictionCTOThresholdBoost = 0.15
+
 func DetectContradiction(snap *reasoningv1.ConversationSnapshot, cfg ContradictionConfig) *reasoningv1.CognitiveAssessment {
 	if snap == nil {
 		return nil
 	}
 
+	// Track which turn numbers come from user override turns so we can skip them
+	// as contradiction candidates.
+	overrideTurns := make(map[uint32]bool)
+	for _, turn := range snap.GetTurns() {
+		if strings.HasPrefix(strings.ToLower(turn.GetRawText()), userOverridePrefix) {
+			overrideTurns[turn.GetTurnNumber()] = true
+		}
+	}
+
+	// For claude_code_session, require higher confidence before emitting.
+	// CTO sessions legitimately change direction; the raised bar avoids false positives.
+	isCTOSession := snap.GetObjective() == "claude_code_session"
+
 	var sentences []sentenceRecord
 	for _, turn := range snap.GetTurns() {
+		// Skip user override turns — they are expected direction changes, not contradictions.
+		if overrideTurns[turn.GetTurnNumber()] {
+			continue
+		}
 		lower := textutil.NormalizeQuotes(strings.ToLower(turn.GetRawText()))
 		for _, sent := range splitSentences(lower) {
 			sent = strings.TrimSpace(sent)
@@ -345,14 +373,25 @@ func DetectContradiction(snap *reasoningv1.ConversationSnapshot, cfg Contradicti
 			}
 
 			confidence := contradictionConfidence(overlap, kind)
-			severity := contradictionSeverity(confidence)
+
+			// Raise the effective confidence threshold for CTO/claude_code sessions.
+			// Only emit if confidence exceeds the boost threshold; otherwise suppress.
+			if isCTOSession && confidence <= contradictionCTOThresholdBoost {
+				continue
+			}
+			emitConfidence := confidence
+			if isCTOSession {
+				emitConfidence = confidence - contradictionCTOThresholdBoost
+			}
+
+			severity := contradictionSeverity(emitConfidence)
 
 			return &reasoningv1.CognitiveAssessment{
 				FindingType:   reasoningv1.FindingType_CONTRADICTION,
 				Severity:      severity,
 				Explanation:   "Contradictory statements detected from the same speaker across turns",
 				RelevantTurns: []uint32{a.turn, b.turn},
-				Confidence:    confidence,
+				Confidence:    emitConfidence,
 				DetectorName:  "contradiction-tracker",
 				Contradiction: &reasoningv1.ContradictionDetail{
 					ClaimAText: a.text,
@@ -618,11 +657,12 @@ func stemFreqMap(freq map[string]float64) map[string]float64 {
 // ============================================================
 
 type ScopeGuardConfig struct {
-	DriftThreshold float64 // weighted Jaccard divergence above which a turn counts as drifting
-	MinTurns       uint32  // minimum turns before drift detection activates
-	ReferenceTurns uint32  // number of early turns to include in the reference set (default 3)
-	WindowSize     uint32  // sliding window size for current-topic aggregation (default 3)
-	SustainedTurns uint32  // consecutive drifting turns required before flagging (default 3)
+	DriftThreshold    float64 // weighted Jaccard divergence above which a turn counts as drifting
+	MinTurns          uint32  // minimum turns before drift detection activates
+	ReferenceTurns    uint32  // number of early turns to include in the reference set (default 3)
+	WindowSize        uint32  // sliding window size for current-topic aggregation (default 3)
+	SustainedTurns    uint32  // consecutive drifting turns required before flagging (default 3)
+	OrchestrationMode bool    // when true, raises DriftThreshold by 20% (cap 0.98) to reduce FPs in multi-project CTO sessions
 }
 
 func DefaultScopeGuardConfig() ScopeGuardConfig {
@@ -651,6 +691,16 @@ func DetectScopeDrift(snap *reasoningv1.ConversationSnapshot, cfg ScopeGuardConf
 	turns := snap.GetTurns()
 	if uint32(len(turns)) < cfg.MinTurns {
 		return nil
+	}
+
+	// OrchestrationMode: raise DriftThreshold by 20% to reduce false positives
+	// in multi-project CTO sessions where wide topic coverage is expected.
+	effectiveDriftThreshold := cfg.DriftThreshold
+	if cfg.OrchestrationMode {
+		effectiveDriftThreshold = cfg.DriftThreshold * 1.2
+		if effectiveDriftThreshold > 0.98 {
+			effectiveDriftThreshold = 0.98
+		}
 	}
 
 	// Stage 1: Build reference frequency map from objective + first K turns.
@@ -712,7 +762,7 @@ func DetectScopeDrift(snap *reasoningv1.ConversationSnapshot, cfg ScopeGuardConf
 
 		dist := weightedJaccardDivergence(refFreq, windowFreq)
 
-		if dist > cfg.DriftThreshold {
+		if dist > effectiveDriftThreshold {
 			consecutiveDrift++
 			if consecutiveDrift >= int(cfg.SustainedTurns) {
 				sustained = true

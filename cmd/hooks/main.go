@@ -55,9 +55,10 @@ type HookSpecificOutput struct {
 
 // HookSession persists conversation state between hook invocations.
 type HookSession struct {
-	SessionID    string        `json:"session_id"`
-	Interactions []Interaction `json:"interactions"`
-	LastUpdated  time.Time     `json:"last_updated"`
+	SessionID            string         `json:"session_id"`
+	Interactions         []Interaction  `json:"interactions"`
+	LastUpdated          time.Time      `json:"last_updated"`
+	ReportedPathologies  map[string]int `json:"reported_pathologies,omitempty"` // finding_type → interaction count when last reported
 }
 
 // Interaction is a single turn in the conversation.
@@ -176,7 +177,9 @@ func handleStop(input HookInput) {
 		return
 	}
 
-	summary := formatPipelineResult(result)
+	summary := formatPipelineResultWithCooldown(result, sess)
+	// Save session after cooldown map may have been updated.
+	saveSession(input.SessionID, sess)
 	if summary == "" {
 		outputContinue()
 		return
@@ -195,19 +198,48 @@ func runPipeline(sess *HookSession) *pipeline.PipelineResult {
 	}
 
 	snap := buildSnapshot(sess)
-	cfg := buildPipelineConfig()
+	cfg := buildPipelineConfig(sess)
 
 	return pipeline.Run(snap, cfg)
 }
 
+// userOverridePhrases are patterns that indicate the user is explicitly changing direction.
+// When a user turn matches these, the turn is tagged [USER_OVERRIDE] so the contradiction
+// detector can skip it as a contradiction candidate.
+var userOverridePhrases = []string{
+	"actually", "no, don't", "instead", "change your", "i want you to",
+	"forget that", "disregard", "new approach", "let's do", "lets do",
+	"scratch that", "never mind", "start over", "do x instead",
+}
+
+// isUserOverrideTurn returns true if the turn text contains explicit direction-change signals.
+func isUserOverrideTurn(role, text string) bool {
+	if role != "user" {
+		return false
+	}
+	lower := strings.ToLower(text)
+	for _, phrase := range userOverridePhrases {
+		if strings.Contains(lower, phrase) {
+			return true
+		}
+	}
+	return false
+}
+
 // buildSnapshot converts session interactions into a proto ConversationSnapshot.
+// User turns that contain direction-change signals are prefixed with [USER_OVERRIDE]
+// so the contradiction detector can skip them as contradiction candidates.
 func buildSnapshot(sess *HookSession) *reasoningv1.ConversationSnapshot {
 	turns := make([]*reasoningv1.Turn, 0, len(sess.Interactions))
 	for i, inter := range sess.Interactions {
+		rawText := inter.Content
+		if isUserOverrideTurn(inter.Role, inter.Content) {
+			rawText = "[USER_OVERRIDE] " + rawText
+		}
 		turns = append(turns, &reasoningv1.Turn{
 			TurnNumber: uint32(i + 1),
 			Speaker:    inter.Role,
-			RawText:    inter.Content,
+			RawText:    rawText,
 		})
 	}
 	return &reasoningv1.ConversationSnapshot{
@@ -217,15 +249,53 @@ func buildSnapshot(sess *HookSession) *reasoningv1.ConversationSnapshot {
 	}
 }
 
+// orchestrationProjectNames is the set of uppercase project identifiers whose
+// presence in session text indicates a multi-project orchestration session.
+var orchestrationProjectNames = []string{
+	"AETHELRED", "CereBRO", "GEARS", "DORIANG", "FuzzyGuard",
+	"SLR", "LAMS", "PTS", "OIL", "brutem", "Sophrim",
+}
+
+// isOrchestrationSession returns true when the session has > 8 interactions AND
+// contains multi-project indicators (turns mentioning "project", "AETHELRED",
+// "deploy", or multiple uppercase project names).
+func isOrchestrationSession(sess *HookSession) bool {
+	if len(sess.Interactions) <= 8 {
+		return false
+	}
+	projectMentions := 0
+	for _, inter := range sess.Interactions {
+		text := inter.Content
+		if strings.Contains(strings.ToLower(text), "project") ||
+			strings.Contains(strings.ToLower(text), "deploy") {
+			projectMentions++
+		}
+		for _, name := range orchestrationProjectNames {
+			if strings.Contains(text, name) {
+				projectMentions++
+				break
+			}
+		}
+	}
+	return projectMentions >= 3
+}
+
 // buildPipelineConfig constructs a pipeline config with fuzzy components.
 // Loads FIS configs from the source tree or ~/.cerebro/config/fis/.
-func buildPipelineConfig() pipeline.PipelineConfig {
+func buildPipelineConfig(sess *HookSession) pipeline.PipelineConfig {
 	cfg := pipeline.DefaultPipelineConfig()
 	cfg.UseInhibitor = true
 	cfg.UseNeuromodulation = true
 	cfg.UseMetacognition = false // skip for speed
 	cfg.UseSalience = false     // skip for speed
 	cfg.UseLayer0 = false       // skip for hook (not needed for Claude Code)
+
+	// Detect multi-project orchestration sessions and set OrchestrationMode.
+	// This raises the scope-drift trigger threshold by 20% to avoid false
+	// positives in CTO sessions that legitimately span multiple projects.
+	if sess != nil && isOrchestrationSession(sess) {
+		cfg.ScopeGuard.OrchestrationMode = true
+	}
 
 	// Try to load FIS configs. If any fail, fall back to crisp.
 	fisPath := findFISDir()
@@ -327,6 +397,77 @@ func formatPipelineResult(result *pipeline.PipelineResult) string {
 	if result.Arbitration != nil && result.Arbitration.CompoundPathology > 0.2 {
 		arb = fmt.Sprintf("\nCompound pathology: %.2f (%s)",
 			result.Arbitration.CompoundPathology, result.Arbitration.Action)
+	}
+
+	return fmt.Sprintf(
+		"CereBRO reasoning monitor (integrity=%.2f) detected:\n%s%s\n"+
+			"Consider whether these patterns are affecting your reasoning quality.",
+		report.GetOverallIntegrityScore(),
+		strings.Join(parts, "\n"),
+		arb,
+	)
+}
+
+// pathologyCooldownTurns is the number of interaction turns that must pass
+// before the same pathology type can be re-reported. Prevents COMPOUND_PATHOLOGY
+// (and other findings) from firing on every single turn once triggered.
+const pathologyCooldownTurns = 5
+
+// formatPipelineResultWithCooldown is like formatPipelineResult but filters out
+// findings whose type was already reported within the last pathologyCooldownTurns
+// interactions. It updates sess.ReportedPathologies for any findings that ARE emitted.
+func formatPipelineResultWithCooldown(result *pipeline.PipelineResult, sess *HookSession) string {
+	if result == nil || result.Report == nil {
+		return ""
+	}
+
+	report := result.Report
+	currentCount := len(sess.Interactions)
+
+	if sess.ReportedPathologies == nil {
+		sess.ReportedPathologies = make(map[string]int)
+	}
+
+	var parts []string
+	emittedTypes := make(map[string]bool)
+
+	for _, f := range report.GetFindings() {
+		if f.GetConfidence() < 0.2 {
+			continue
+		}
+		findingType := f.GetFindingType().String()
+		lastReportedAt, wasReported := sess.ReportedPathologies[findingType]
+		if wasReported && (currentCount-lastReportedAt) <= pathologyCooldownTurns {
+			continue // still in cooldown — suppress re-emission
+		}
+		parts = append(parts, fmt.Sprintf("- %s (%s, conf=%.2f): %s",
+			findingType,
+			f.GetSeverity().String(),
+			f.GetConfidence(),
+			f.GetExplanation(),
+		))
+		emittedTypes[findingType] = true
+	}
+
+	if len(parts) == 0 {
+		return ""
+	}
+
+	// Update ReportedPathologies for emitted findings.
+	for ft := range emittedTypes {
+		sess.ReportedPathologies[ft] = currentCount
+	}
+
+	// Include arbitration if available.
+	arb := ""
+	if result.Arbitration != nil && result.Arbitration.CompoundPathology > 0.2 {
+		arbType := "COMPOUND_PATHOLOGY"
+		lastReportedAt, wasReported := sess.ReportedPathologies[arbType]
+		if !wasReported || (currentCount-lastReportedAt) > pathologyCooldownTurns {
+			arb = fmt.Sprintf("\nCompound pathology: %.2f (%s)",
+				result.Arbitration.CompoundPathology, result.Arbitration.Action)
+			sess.ReportedPathologies[arbType] = currentCount
+		}
 	}
 
 	return fmt.Sprintf(
