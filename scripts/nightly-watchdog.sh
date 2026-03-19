@@ -27,7 +27,7 @@ check "SLR" "curl -sf --max-time 5 http://192.168.14.69:8080/health > /dev/null 
 check "Sophrim" "curl -sf --max-time 5 http://192.168.14.65:8090/health > /dev/null 2>&1" "Sophrim unreachable."
 
 if [[ -f "$LOG_DIR/phases.log" ]]; then
-    FAILURES=$(grep -c "FAILED\|ABORT" "$LOG_DIR/phases.log" 2>/dev/null || echo 0)
+    FAILURES=$(grep -c "FAILED\|ABORT" "$LOG_DIR/phases.log" 2>/dev/null; true)
     check "Phase failures" "[[ $FAILURES -lt 2 ]]" "$FAILURES phases failed."
 fi
 

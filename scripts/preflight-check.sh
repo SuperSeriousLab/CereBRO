@@ -4,7 +4,8 @@ set -euo pipefail
 
 SERVICES=(
     "Ollama|http://10.70.70.14:11434/api/tags"
-    "SLR|http://192.168.14.69:8080/health"
+    "SLR-admin|http://192.168.14.69:8080/health"
+    "SLR-gateway|http://192.168.14.69:8081/v1/models"
     "Sophrim|http://192.168.14.65:8090/health"
 )
 
