@@ -24,6 +24,9 @@
 
 set -uo pipefail
 
+# Load API keys not available in cron env
+[[ -f /home/js/.config/consult/keys ]] && source /home/js/.config/consult/keys
+
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
