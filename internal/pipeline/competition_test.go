@@ -429,8 +429,12 @@ func TestPreCortexBaseline(t *testing.T) {
 	if recall < 0.99 {
 		t.Errorf("expected recall=1.00, got %.2f", recall)
 	}
-	if totalFP != 5 {
-		t.Errorf("expected 5 FP (pre-pipeline baseline), got %d", totalFP)
+	// Pre-cortex FP count after contradiction-tracker threshold fix (2026-03-20):
+	// Reduced from 5 → 3. The contradiction detector previously accounted for
+	// 2 of the 5 FPs. The remaining 3 come from other detectors in the pre-cortex
+	// path (outside the scope of the contradiction fix).
+	if totalFP != 3 {
+		t.Errorf("expected 3 FP (pre-pipeline baseline after contradiction fix), got %d", totalFP)
 	}
 }
 
@@ -476,11 +480,14 @@ func TestFullCortexNoRegression(t *testing.T) {
 	if recall < 0.99 {
 		t.Errorf("REGRESSION: recall=%.2f (expected 1.00)", recall)
 	}
-	if totalFP != 2 {
-		t.Errorf("REGRESSION: FP=%d (expected 2)", totalFP)
+	// Full-cortex FP count after contradiction-tracker threshold fix (2026-03-20):
+	// Reduced from 2 → 0. The contradiction detector was the source of the 2 FPs.
+	// Perfect precision achieved with the raised threshold and semantic filtering.
+	if totalFP != 0 {
+		t.Errorf("REGRESSION: FP=%d (expected 0 after contradiction fix)", totalFP)
 	}
-	if f1 < 0.90 {
-		t.Errorf("REGRESSION: F1=%.2f (expected ≥0.90)", f1)
+	if f1 < 0.99 {
+		t.Errorf("REGRESSION: F1=%.2f (expected ≥0.99 after contradiction fix)", f1)
 	}
 }
 
@@ -611,15 +618,17 @@ func TestArchitectureCompetition(t *testing.T) {
 	}
 
 	// Variant A must match current pipeline.
+	// Updated 2026-03-20: contradiction-tracker fix reduced FP from 2 → 0.
 	aTraits := variantTraits["A-full-cortex"]
-	if aTraits["false_positives"] != 2 {
-		t.Errorf("Variant A FP=%.0f (expected 2)", aTraits["false_positives"])
+	if aTraits["false_positives"] != 0 {
+		t.Errorf("Variant A FP=%.0f (expected 0 after contradiction fix)", aTraits["false_positives"])
 	}
 
 	// Variant E must match pre-pipeline baseline.
+	// Updated 2026-03-20: contradiction-tracker fix reduced FP from 5 → 3.
 	eTraits := variantTraits["E-pre-cortex"]
-	if eTraits["false_positives"] != 5 {
-		t.Errorf("Variant E FP=%.0f (expected 5)", eTraits["false_positives"])
+	if eTraits["false_positives"] != 3 {
+		t.Errorf("Variant E FP=%.0f (expected 3 after contradiction fix)", eTraits["false_positives"])
 	}
 
 	// Pareto frontier must not be empty.

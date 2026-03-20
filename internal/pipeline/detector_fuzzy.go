@@ -187,7 +187,7 @@ func applyContradictionFuzzy(finding *reasoningv1.CognitiveAssessment, snap *rea
 	}
 	// Recompute signals from the contradiction detail.
 	overlap := wordOverlap(cd.GetClaimAText(), cd.GetClaimBText())
-	kind := detectContradictionKind(cd.GetClaimAText(), cd.GetClaimBText())
+	kind := detectContradictionKind(cd.GetClaimAText(), cd.GetClaimBText(), overlap)
 	kindStrength := contradictionKindStrength(kind)
 
 	sev, ok := df.evaluateContradictionSeverity(overlap, kindStrength)
