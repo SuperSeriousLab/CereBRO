@@ -1,9 +1,17 @@
 package pipeline
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
 	"math"
+	"net/http"
 	"sort"
+	"strconv"
 	"strings"
+	"time"
 
 	cerebrov1 "github.com/SuperSeriousLab/CereBRO/gen/go/cerebro/v1"
 	reasoningv1 "github.com/SuperSeriousLab/CereBRO/gen/go/cog/reasoning/v1"
@@ -657,12 +665,20 @@ func stemFreqMap(freq map[string]float64) map[string]float64 {
 // ============================================================
 
 type ScopeGuardConfig struct {
-	DriftThreshold    float64 // weighted Jaccard divergence above which a turn counts as drifting
+	DriftThreshold    float64 // divergence above which a turn counts as drifting (Jaccard or 1-semantic_sim)
 	MinTurns          uint32  // minimum turns before drift detection activates
 	ReferenceTurns    uint32  // number of early turns to include in the reference set (default 3)
 	WindowSize        uint32  // sliding window size for current-topic aggregation (default 3)
 	SustainedTurns    uint32  // consecutive drifting turns required before flagging (default 3)
 	OrchestrationMode bool    // when true, raises DriftThreshold by 20% (cap 0.98) to reduce FPs in multi-project CTO sessions
+
+	// SLR semantic similarity — primary drift measure.
+	// When SLREndpoint is non-empty, DetectScopeDrift calls the SLR OpenAI-compat
+	// chat/completions endpoint to score semantic similarity (0–1) between the
+	// reference scope and the current window, then converts to divergence (1 – sim).
+	// On any SLR error the function falls back to weightedJaccardDivergence.
+	SLREndpoint string        // e.g. "http://192.168.14.69:8081" (empty = skip SLR, pure Jaccard)
+	SLRTimeout  time.Duration // per-call timeout; 0 means 4 s default
 }
 
 func DefaultScopeGuardConfig() ScopeGuardConfig {
@@ -670,12 +686,28 @@ func DefaultScopeGuardConfig() ScopeGuardConfig {
 		// 0.79 instead of 0.80: stemming in extractKeywords reduces Jaccard distances
 		// by ~0.01–0.02 on average (inflected forms now merge into stems). Lowering the
 		// threshold by 0.01 preserves detection of borderline cases while keeping FPR at zero.
+		// The same threshold applies when using semantic divergence (1 – similarity).
 		DriftThreshold: 0.79,
 		MinTurns:       3,
 		ReferenceTurns: 4,
 		WindowSize:     3,
 		SustainedTurns: 8,
+		// SLREndpoint defaults to empty: pure Jaccard mode (safe for tests and
+		// offline deployments).  Set to "http://192.168.14.69:8081" (or use
+		// DefaultScopeGuardConfigWithSLR) to enable semantic similarity via SLR.
+		SLREndpoint: "",
+		SLRTimeout:  4 * time.Second,
 	}
+}
+
+// DefaultScopeGuardConfigWithSLR returns the default Scope Guard config with
+// semantic similarity enabled via the SLR gateway.  Falls back to Jaccard
+// automatically if SLR is unreachable.
+func DefaultScopeGuardConfigWithSLR() ScopeGuardConfig {
+	cfg := DefaultScopeGuardConfig()
+	cfg.SLREndpoint = "http://192.168.14.69:8081"
+	cfg.SLRTimeout = 4 * time.Second
+	return cfg
 }
 
 func DetectScopeDrift(snap *reasoningv1.ConversationSnapshot, cfg ScopeGuardConfig) *reasoningv1.CognitiveAssessment {
@@ -760,7 +792,7 @@ func DetectScopeDrift(snap *reasoningv1.ConversationSnapshot, cfg ScopeGuardConf
 			}
 		}
 
-		dist := weightedJaccardDivergence(refFreq, windowFreq)
+		dist := scopeDivergence(refFreq, windowFreq, objectiveKW, turnKWs, winStart, i, cfg)
 
 		if dist > effectiveDriftThreshold {
 			consecutiveDrift++
@@ -828,6 +860,161 @@ func weightedJaccardDivergence(a, b map[string]float64) float64 {
 		return 0.0
 	}
 	return 1.0 - minSum/maxSum
+}
+
+// scopeDivergence returns a drift distance in [0,1] for one window evaluation.
+// Primary: calls SLR (OpenAI-compat) to get semantic similarity between the
+// reference scope text and the current window text, converts to divergence
+// (1 – similarity).  On any SLR error it falls back to weightedJaccardDivergence.
+func scopeDivergence(refFreq, windowFreq map[string]float64, objectiveKW []string, turnKWs [][]string, winStart, winEnd int, cfg ScopeGuardConfig) float64 {
+	if cfg.SLREndpoint == "" {
+		return weightedJaccardDivergence(refFreq, windowFreq)
+	}
+
+	// Build human-readable reference text from objective keywords + refFreq keys.
+	refParts := make([]string, 0, len(objectiveKW))
+	refParts = append(refParts, objectiveKW...)
+	for k := range refFreq {
+		found := false
+		for _, kw := range objectiveKW {
+			if kw == k {
+				found = true
+				break
+			}
+		}
+		if !found {
+			refParts = append(refParts, k)
+		}
+	}
+	refText := strings.Join(refParts, " ")
+
+	// Build human-readable window text from sliding window keywords.
+	var winParts []string
+	for j := winStart; j <= winEnd; j++ {
+		if j < len(turnKWs) {
+			winParts = append(winParts, turnKWs[j]...)
+		}
+	}
+	windowText := strings.Join(winParts, " ")
+
+	if refText == "" || windowText == "" {
+		return weightedJaccardDivergence(refFreq, windowFreq)
+	}
+
+	sim, err := slrSemanticSimilarity(refText, windowText, cfg)
+	if err != nil {
+		// Fallback to Jaccard on any SLR error (network down, timeout, parse failure).
+		return weightedJaccardDivergence(refFreq, windowFreq)
+	}
+	if sim < 0 {
+		sim = 0
+	}
+	if sim > 1 {
+		sim = 1
+	}
+	return 1.0 - sim
+}
+
+// slrOpenAIRequest is the OpenAI-compat chat completions request body.
+type slrOpenAIRequest struct {
+	Model       string              `json:"model"`
+	Messages    []slrOpenAIMessage  `json:"messages"`
+	Temperature float64             `json:"temperature"`
+	MaxTokens   int                 `json:"max_tokens"`
+}
+
+type slrOpenAIMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+// slrOpenAIResponse is a minimal parse of the OpenAI-compat response.
+type slrOpenAIResponse struct {
+	Choices []struct {
+		Message struct {
+			Content string `json:"content"`
+		} `json:"message"`
+	} `json:"choices"`
+}
+
+// slrSemanticSimilarity calls the SLR OpenAI-compat endpoint and asks the model
+// to score semantic similarity (0–1) between refText and windowText.
+// Returns the parsed float or an error (caller falls back to Jaccard on error).
+func slrSemanticSimilarity(refText, windowText string, cfg ScopeGuardConfig) (float64, error) {
+	timeout := cfg.SLRTimeout
+	if timeout <= 0 {
+		timeout = 4 * time.Second
+	}
+
+	prompt := fmt.Sprintf(
+		"Score the semantic similarity between TEXT_A and TEXT_B on a scale from 0.0 to 1.0.\n"+
+			"0.0 = completely unrelated topics, 1.0 = identical meaning.\n"+
+			"Reply with ONLY a single decimal number between 0.0 and 1.0. No explanation.\n\n"+
+			"TEXT_A (original scope): %s\n\n"+
+			"TEXT_B (current conversation window): %s",
+		refText, windowText,
+	)
+
+	reqBody := slrOpenAIRequest{
+		Model: "slr-local",
+		Messages: []slrOpenAIMessage{
+			{Role: "user", Content: prompt},
+		},
+		Temperature: 0.0,
+		MaxTokens:   16,
+	}
+
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return 0, fmt.Errorf("slr marshal: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		cfg.SLREndpoint+"/v1/chat/completions", bytes.NewReader(body))
+	if err != nil {
+		return 0, fmt.Errorf("slr request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("slr call: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("slr returned %d", resp.StatusCode)
+	}
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, fmt.Errorf("slr read: %w", err)
+	}
+
+	var oaiResp slrOpenAIResponse
+	if err := json.Unmarshal(respBody, &oaiResp); err != nil {
+		return 0, fmt.Errorf("slr parse: %w", err)
+	}
+	if len(oaiResp.Choices) == 0 {
+		return 0, fmt.Errorf("slr: no choices in response")
+	}
+
+	content := strings.TrimSpace(oaiResp.Choices[0].Message.Content)
+	sim, err := strconv.ParseFloat(content, 64)
+	if err != nil {
+		// Try extracting first float-like token from response.
+		for _, tok := range strings.Fields(content) {
+			tok = strings.Trim(tok, ".,;:\"'")
+			if f, e := strconv.ParseFloat(tok, 64); e == nil {
+				return f, nil
+			}
+		}
+		return 0, fmt.Errorf("slr parse float %q: %w", content, err)
+	}
+	return sim, nil
 }
 
 func scopeSeverityFromDrift(drift float64) reasoningv1.FindingSeverity {
