@@ -287,7 +287,10 @@ type ContradictionConfig struct {
 }
 
 func DefaultContradictionConfig() ContradictionConfig {
-	return ContradictionConfig{MinOverlap: 0.3}
+	// Raised from 0.3 → 0.6: sentences must share 60% of content words to be
+	// comparable candidates. The old 0.3 threshold let unrelated sentences pair
+	// on incidental shared words, contributing to 100% FP rate in production.
+	return ContradictionConfig{MinOverlap: 0.6}
 }
 
 var negationPrefixes = []string{
@@ -317,11 +320,20 @@ type sentenceRecord struct {
 // detector skips turns with this prefix as contradiction candidates.
 const userOverridePrefix = "[user_override]"
 
-// contradictionMinConfidence is the base minimum confidence required to emit a
-// contradiction finding for a claude_code_session objective. CTO sessions
-// legitimately change direction, so we raise the bar by 0.15 vs. the computed
-// contradictionConfidence (which starts at 0.4 base + overlap*0.3 + kind bonus).
-const contradictionCTOThresholdBoost = 0.15
+// contradictionMinEmitConfidence is the absolute minimum confidence required to
+// emit a contradiction finding. Production data showed 0% precision (0/49
+// genuine) with the old 0.4 base confidence. We require ≥0.75 before emitting
+// to ensure only strongly-evidenced contradictions surface.
+const contradictionMinEmitConfidence = 0.75
+
+// contradictionCTOThresholdBoost adds an extra margin for claude_code_session
+// objectives, where direction changes are expected. CTO sessions require ≥0.85.
+const contradictionCTOThresholdBoost = 0.10
+
+// contradictionMinSentenceLen is the minimum character length a sentence must
+// have to qualify as a contradiction candidate. Very short sentences ("yes.",
+// "ok.", "no.") match too broadly.
+const contradictionMinSentenceLen = 15
 
 func DetectContradiction(snap *reasoningv1.ConversationSnapshot, cfg ContradictionConfig) *reasoningv1.CognitiveAssessment {
 	if snap == nil {
@@ -341,6 +353,11 @@ func DetectContradiction(snap *reasoningv1.ConversationSnapshot, cfg Contradicti
 	// CTO sessions legitimately change direction; the raised bar avoids false positives.
 	isCTOSession := snap.GetObjective() == "claude_code_session"
 
+	minConfidence := contradictionMinEmitConfidence
+	if isCTOSession {
+		minConfidence = contradictionMinEmitConfidence + contradictionCTOThresholdBoost
+	}
+
 	var sentences []sentenceRecord
 	for _, turn := range snap.GetTurns() {
 		// Skip user override turns — they are expected direction changes, not contradictions.
@@ -350,7 +367,9 @@ func DetectContradiction(snap *reasoningv1.ConversationSnapshot, cfg Contradicti
 		lower := textutil.NormalizeQuotes(strings.ToLower(turn.GetRawText()))
 		for _, sent := range splitSentences(lower) {
 			sent = strings.TrimSpace(sent)
-			if len(sent) < 3 {
+			// Raised from 3 → contradictionMinSentenceLen to filter noise sentences
+			// that match too broadly on short shared words.
+			if len(sent) < contradictionMinSentenceLen {
 				continue
 			}
 			sentences = append(sentences, sentenceRecord{
@@ -375,31 +394,28 @@ func DetectContradiction(snap *reasoningv1.ConversationSnapshot, cfg Contradicti
 				continue
 			}
 
-			kind := detectContradictionKind(a.text, b.text)
+			kind := detectContradictionKind(a.text, b.text, overlap)
 			if kind == "" {
 				continue
 			}
 
 			confidence := contradictionConfidence(overlap, kind)
 
-			// Raise the effective confidence threshold for CTO/claude_code sessions.
-			// Only emit if confidence exceeds the boost threshold; otherwise suppress.
-			if isCTOSession && confidence <= contradictionCTOThresholdBoost {
+			// Suppress findings below the absolute minimum confidence threshold.
+			// This is the primary guard against false positives: only emit when
+			// all signals (overlap + kind) combine to genuinely high confidence.
+			if confidence < minConfidence {
 				continue
 			}
-			emitConfidence := confidence
-			if isCTOSession {
-				emitConfidence = confidence - contradictionCTOThresholdBoost
-			}
 
-			severity := contradictionSeverity(emitConfidence)
+			severity := contradictionSeverity(confidence)
 
 			return &reasoningv1.CognitiveAssessment{
 				FindingType:   reasoningv1.FindingType_CONTRADICTION,
 				Severity:      severity,
 				Explanation:   "Contradictory statements detected from the same speaker across turns",
 				RelevantTurns: []uint32{a.turn, b.turn},
-				Confidence:    emitConfidence,
+				Confidence:    confidence,
 				DetectorName:  "contradiction-tracker",
 				Contradiction: &reasoningv1.ContradictionDetail{
 					ClaimAText: a.text,
@@ -497,7 +513,10 @@ func wordOverlap(a, b string) float64 {
 	return float64(intersection) / float64(smaller)
 }
 
-func detectContradictionKind(a, b string) string {
+// detectContradictionKind classifies the type of contradiction between two
+// sentences. The overlap parameter is passed so antonym detection can require
+// meaningful topic overlap before firing on a single antonym pair.
+func detectContradictionKind(a, b string, overlap float64) string {
 	if hasNegationConflict(a, b) {
 		return "negation"
 	}
@@ -506,22 +525,104 @@ func detectContradictionKind(a, b string) string {
 			return "reversal"
 		}
 	}
-	if hasAntonymConflict(a, b) {
+	// Antonym conflict requires substantial overlap (≥0.5): antonym pairs must
+	// appear in sentences that share significant content — otherwise "increase
+	// budget" vs "never mind the schedule" would fire on always/never with no
+	// semantic link between the sentences.
+	if overlap >= 0.5 && hasAntonymConflict(a, b) {
 		return "antonym"
 	}
 	return ""
 }
 
+// hasNegationConflict checks whether one sentence negates a claim made in the
+// other. The check requires that a negation prefix appears in close proximity
+// to a shared content word — not merely anywhere in the sentence. This prevents
+// incidental negations ("I don't know what to do" paired with any assertion)
+// from triggering on unrelated content.
 func hasNegationConflict(a, b string) bool {
+	sharedWords := sharedContentWords(a, b)
+	if len(sharedWords) == 0 {
+		return false
+	}
+
 	for _, neg := range negationPrefixes {
-		if strings.Contains(b, neg) && !strings.Contains(a, neg) {
-			return true
+		aHas := strings.Contains(a, neg)
+		bHas := strings.Contains(b, neg)
+		if aHas == bHas {
+			// Both have it or neither has it — not a directional conflict.
+			continue
 		}
-		if strings.Contains(a, neg) && !strings.Contains(b, neg) {
+		// One sentence has the negation; the other does not.
+		// Require the negation to appear near a shared content word.
+		negated := a
+		if bHas {
+			negated = b
+		}
+		if negationNearSharedWord(negated, neg, sharedWords) {
 			return true
 		}
 	}
 	return false
+}
+
+// negationNearSharedWord returns true if the negation prefix appears within
+// a ±5 token window of any shared content word. This ensures the negation is
+// semantically linked to the shared subject rather than being an incidental
+// phrase in an otherwise unrelated part of the sentence.
+func negationNearSharedWord(sentence, negPrefix string, sharedWords map[string]bool) bool {
+	words := strings.Fields(sentence)
+	for i, w := range words {
+		clean := strings.Trim(w, ".,!?;:\"'()-")
+		if !sharedWords[clean] {
+			continue
+		}
+		// Check whether a negation prefix occurs within ±5 positions.
+		windowStart := i - 5
+		if windowStart < 0 {
+			windowStart = 0
+		}
+		windowEnd := i + 6
+		if windowEnd > len(words) {
+			windowEnd = len(words)
+		}
+		window := strings.Join(words[windowStart:windowEnd], " ")
+		if strings.Contains(window, negPrefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// sharedContentWords returns the set of non-stopword tokens that appear in
+// both sentences. Used by negation detection to anchor the conflict check.
+func sharedContentWords(a, b string) map[string]bool {
+	stop := map[string]bool{
+		"the": true, "a": true, "an": true, "is": true, "are": true,
+		"was": true, "were": true, "be": true, "been": true, "being": true,
+		"have": true, "has": true, "had": true, "do": true, "does": true,
+		"did": true, "will": true, "would": true, "could": true, "should": true,
+		"may": true, "might": true, "shall": true, "can": true, "to": true,
+		"of": true, "in": true, "for": true, "on": true, "with": true,
+		"at": true, "by": true, "from": true, "it": true, "this": true,
+		"that": true, "i": true, "we": true, "they": true, "you": true,
+		"he": true, "she": true, "and": true, "or": true, "but": true,
+	}
+	setA := make(map[string]bool)
+	for _, w := range strings.Fields(a) {
+		w = strings.Trim(w, ".,!?;:\"'()-")
+		if len(w) > 2 && !stop[w] {
+			setA[w] = true
+		}
+	}
+	shared := make(map[string]bool)
+	for _, w := range strings.Fields(b) {
+		w = strings.Trim(w, ".,!?;:\"'()-")
+		if setA[w] {
+			shared[w] = true
+		}
+	}
+	return shared
 }
 
 func hasAntonymConflict(a, b string) bool {
@@ -536,15 +637,19 @@ func hasAntonymConflict(a, b string) bool {
 }
 
 func contradictionConfidence(overlap float64, kind string) float64 {
-	base := 0.4
-	base += overlap * 0.3
+	// Raised base from 0.4 → 0.65. The old 0.4 base meant any match emitted a
+	// finding at confidence ≥ 0.4, contributing to the 100% FP rate (0/49
+	// genuine in production). Combined with the 0.75 emit threshold, the
+	// detector now requires both high overlap and strong kind evidence.
+	base := 0.65
+	base += overlap * 0.2
 	switch kind {
 	case "negation":
-		base += 0.25
-	case "reversal":
-		base += 0.2
-	case "antonym":
 		base += 0.15
+	case "reversal":
+		base += 0.12
+	case "antonym":
+		base += 0.08
 	}
 	if base > 1.0 {
 		base = 1.0

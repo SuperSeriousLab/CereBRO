@@ -265,6 +265,174 @@ func TestSanitizeID(t *testing.T) {
 	}
 }
 
+func TestProjectRootFromCWD(t *testing.T) {
+	tests := []struct {
+		cwd  string
+		want string
+	}{
+		{"/home/user/eidos/GEARS/cmd/foo", "/home/user/eidos/GEARS"},
+		{"/home/user/eidos/GEARS/internal/pipeline", "/home/user/eidos/GEARS"},
+		{"/home/user/eidos/GEARS", "/home/user/eidos/GEARS"},
+		{"/home/user/eidos/CereBRO", "/home/user/eidos/CereBRO"},
+		{"/tmp", "/tmp"}, // fewer than depth components → return cwd
+		{"", ""},
+	}
+	for _, tt := range tests {
+		got := projectRootFromCWD(tt.cwd)
+		if got != tt.want {
+			t.Errorf("projectRootFromCWD(%q) = %q, want %q", tt.cwd, got, tt.want)
+		}
+	}
+}
+
+func TestDecayPathologiesOnContextChange(t *testing.T) {
+	t.Run("first_cwd_no_decay", func(t *testing.T) {
+		sess := &HookSession{
+			SessionID:           "test",
+			ReportedPathologies: map[string]int{"SYCOPHANCY": 5},
+		}
+		decayPathologiesOnContextChange(sess, "/home/user/eidos/GEARS")
+		// First time: record CWD, do NOT clear pathologies.
+		if sess.LastCWD != "/home/user/eidos/GEARS" {
+			t.Errorf("LastCWD = %q, want %q", sess.LastCWD, "/home/user/eidos/GEARS")
+		}
+		if len(sess.ReportedPathologies) == 0 {
+			t.Error("ReportedPathologies should NOT be cleared on first CWD observation")
+		}
+	})
+
+	t.Run("same_project_no_decay", func(t *testing.T) {
+		sess := &HookSession{
+			SessionID:           "test",
+			LastCWD:             "/home/user/eidos/GEARS/cmd",
+			ReportedPathologies: map[string]int{"SYCOPHANCY": 5},
+		}
+		decayPathologiesOnContextChange(sess, "/home/user/eidos/GEARS/internal/pipeline")
+		// Same project root (/home/user/eidos/GEARS) → no reset.
+		if len(sess.ReportedPathologies) == 0 {
+			t.Error("ReportedPathologies should NOT be cleared within same project")
+		}
+	})
+
+	t.Run("different_project_resets_pathologies", func(t *testing.T) {
+		sess := &HookSession{
+			SessionID:           "test",
+			LastCWD:             "/home/user/eidos/GEARS/cmd",
+			ReportedPathologies: map[string]int{"SYCOPHANCY": 5, "COMPOUND_PATHOLOGY": 10},
+		}
+		decayPathologiesOnContextChange(sess, "/home/user/eidos/CereBRO/internal")
+		// Different project root → pathologies cleared.
+		if len(sess.ReportedPathologies) != 0 {
+			t.Errorf("ReportedPathologies should be cleared on project change, got: %v", sess.ReportedPathologies)
+		}
+		if sess.LastCWD != "/home/user/eidos/CereBRO/internal" {
+			t.Errorf("LastCWD = %q, want %q", sess.LastCWD, "/home/user/eidos/CereBRO/internal")
+		}
+	})
+
+	t.Run("empty_cwd_noop", func(t *testing.T) {
+		sess := &HookSession{
+			SessionID:           "test",
+			LastCWD:             "/home/user/eidos/GEARS",
+			ReportedPathologies: map[string]int{"SYCOPHANCY": 5},
+		}
+		decayPathologiesOnContextChange(sess, "")
+		// Empty CWD → no-op.
+		if sess.LastCWD != "/home/user/eidos/GEARS" {
+			t.Errorf("LastCWD should be unchanged for empty CWD, got: %q", sess.LastCWD)
+		}
+		if len(sess.ReportedPathologies) == 0 {
+			t.Error("ReportedPathologies should NOT be cleared on empty CWD")
+		}
+	})
+}
+
+func TestIsUserOverrideTurn(t *testing.T) {
+	tests := []struct {
+		role string
+		text string
+		want bool
+	}{
+		{"user", "Actually, let's do it differently", true},
+		{"user", "No, don't use that approach", true},
+		{"user", "Instead, use the other method", true},
+		{"user", "Scratch that, start over", true},
+		{"user", "This looks fine to me", false},
+		{"assistant", "Actually I was wrong", false}, // only user turns
+		{"user", "", false},
+	}
+	for _, tt := range tests {
+		got := isUserOverrideTurn(tt.role, tt.text)
+		if got != tt.want {
+			t.Errorf("isUserOverrideTurn(%q, %q) = %v, want %v", tt.role, tt.text, got, tt.want)
+		}
+	}
+}
+
+func TestIsOrchestrationSession(t *testing.T) {
+	t.Run("short_session_not_orchestration", func(t *testing.T) {
+		sess := &HookSession{
+			Interactions: []Interaction{
+				{Role: "user", Content: "Fix bug in AETHELRED"},
+				{Role: "assistant", Content: "Done"},
+			},
+		}
+		if isOrchestrationSession(sess) {
+			t.Error("short session should not be detected as orchestration")
+		}
+	})
+
+	t.Run("long_multi_project_session", func(t *testing.T) {
+		interactions := []Interaction{
+			{Role: "user", Content: "Deploy AETHELRED and check CereBRO status"},
+			{Role: "assistant", Content: "Deploying AETHELRED..."},
+			{Role: "user", Content: "Now update the GEARS project config"},
+			{Role: "assistant", Content: "Updating GEARS..."},
+			{Role: "user", Content: "Also check DORIANG project health"},
+			{Role: "assistant", Content: "Checking DORIANG..."},
+			{Role: "user", Content: "Deploy SLR to production"},
+			{Role: "assistant", Content: "Deploying SLR..."},
+			{Role: "user", Content: "Final project check"},
+		}
+		sess := &HookSession{Interactions: interactions}
+		if !isOrchestrationSession(sess) {
+			t.Error("multi-project session with many interactions should be detected as orchestration")
+		}
+	})
+}
+
+func TestFormatPipelineResultWithCooldown(t *testing.T) {
+	t.Run("suppresses_within_cooldown", func(t *testing.T) {
+		sess := &HookSession{
+			SessionID:           "cooldown-test",
+			ReportedPathologies: map[string]int{"SYCOPHANCY": 8},
+		}
+		// Add interactions to set currentCount = 10 (within cooldown of 5 from count=8)
+		for i := 0; i < 10; i++ {
+			sess.Interactions = append(sess.Interactions, Interaction{Role: "user", Content: "turn"})
+		}
+
+		finding := &reasoningv1.CognitiveAssessment{
+			FindingType: reasoningv1.FindingType_SYCOPHANCY,
+			Severity:    reasoningv1.FindingSeverity_WARNING,
+			Confidence:  0.8,
+			Explanation: "test finding",
+		}
+		result := &pipeline.PipelineResult{
+			Report: &reasoningv1.ReasoningReport{
+				OverallIntegrityScore: 0.5,
+				Findings:              []*reasoningv1.CognitiveAssessment{finding},
+			},
+			Findings: []*reasoningv1.CognitiveAssessment{finding},
+		}
+
+		out := formatPipelineResultWithCooldown(result, sess)
+		if out != "" {
+			t.Errorf("expected suppressed output within cooldown, got: %s", out)
+		}
+	})
+}
+
 func TestAlertCache(t *testing.T) {
 	sessID := "alert-cache-test-" + time.Now().Format("150405")
 

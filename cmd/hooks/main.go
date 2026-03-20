@@ -59,6 +59,7 @@ type HookSession struct {
 	Interactions         []Interaction  `json:"interactions"`
 	LastUpdated          time.Time      `json:"last_updated"`
 	ReportedPathologies  map[string]int `json:"reported_pathologies,omitempty"` // finding_type → interaction count when last reported
+	LastCWD              string         `json:"last_cwd,omitempty"`             // last observed working directory; used for context-change decay
 }
 
 // Interaction is a single turn in the conversation.
@@ -90,6 +91,9 @@ func main() {
 func handleUserPromptSubmit(input HookInput) {
 	// Load session, append user prompt.
 	sess := loadSession(input.SessionID)
+
+	// Decay compound pathology cooldowns if the working directory changed project.
+	decayPathologiesOnContextChange(sess, input.CWD)
 
 	prompt := input.Prompt
 	if prompt == "" {
@@ -152,6 +156,9 @@ func handlePostToolUse(input HookInput) {
 
 func handleStop(input HookInput) {
 	sess := loadSession(input.SessionID)
+
+	// Decay compound pathology cooldowns if the working directory changed project.
+	decayPathologiesOnContextChange(sess, input.CWD)
 
 	msg := input.LastAssistantMsg
 	if msg == "" {
@@ -278,6 +285,62 @@ func isOrchestrationSession(sess *HookSession) bool {
 		}
 	}
 	return projectMentions >= 3
+}
+
+// projectDepthForContextChange is the number of path components (from root)
+// that constitute a "project root" for context-change detection purposes.
+// Depth 4 matches the workspace layout /home/<user>/<workspace>/<project>.
+const projectDepthForContextChange = 4
+
+// projectRootFromCWD returns a stable "project root" prefix by taking the
+// first projectDepthForContextChange path components of cwd. This ensures
+// that two paths within the same project subtree resolve to the same key,
+// regardless of how deep inside the project they are.
+//
+// Examples (depth=4):
+//
+//	/home/user/eidos/GEARS/cmd/foo     → /home/user/eidos/GEARS
+//	/home/user/eidos/GEARS/internal/x  → /home/user/eidos/GEARS
+//	/home/user/eidos/GEARS             → /home/user/eidos/GEARS
+//	/home/user/eidos/CereBRO           → /home/user/eidos/CereBRO
+//	/tmp                               → /tmp  (fewer than depth components)
+func projectRootFromCWD(cwd string) string {
+	if cwd == "" {
+		return ""
+	}
+	// Split path into components and reassemble up to depth.
+	parts := strings.Split(filepath.Clean(cwd), string(filepath.Separator))
+	// parts[0] is "" for absolute paths (before the leading "/")
+	if len(parts) <= projectDepthForContextChange {
+		return cwd
+	}
+	return string(filepath.Separator) + filepath.Join(parts[1:projectDepthForContextChange+1]...)
+}
+
+// decayPathologiesOnContextChange resets the ReportedPathologies map when the
+// working directory indicates the user has moved to a different project. This
+// prevents compound pathology scores from staying suppressed after a topic/project
+// context change. A no-op when cwd is empty or unchanged.
+func decayPathologiesOnContextChange(sess *HookSession, cwd string) {
+	if cwd == "" {
+		return
+	}
+	newRoot := projectRootFromCWD(cwd)
+	oldRoot := projectRootFromCWD(sess.LastCWD)
+
+	if sess.LastCWD == "" {
+		// First time we see a CWD — just record it, no decay needed.
+		sess.LastCWD = cwd
+		return
+	}
+
+	if newRoot != oldRoot {
+		// Project root changed → reset compound pathology cooldowns so detectors
+		// can re-report in the new project context.
+		sess.ReportedPathologies = nil
+	}
+
+	sess.LastCWD = cwd
 }
 
 // buildPipelineConfig constructs a pipeline config with fuzzy components.
