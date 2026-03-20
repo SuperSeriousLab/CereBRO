@@ -8,6 +8,7 @@
 //	POST /findings/{id}/outcome     — Validate a finding (TP or FP)
 //	GET  /findings?detector=X&limit=20 — List recent findings with outcome status
 //	GET  /metrics/detectors         — Per-detector TP/FP precision metrics
+//	GET  /v1/debug/recent           — Last 100 pipeline executions (ring buffer, ?minutes=N)
 //
 // Usage:
 //
@@ -62,13 +63,16 @@ func main() {
 	store := pipeline.NewOutcomeStore(*outcomesPath)
 	log.Printf("cerebro-server: outcome store at %s", *outcomesPath)
 
+	ring := NewDebugRing()
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler)
 	mux.HandleFunc("/info", infoHandler)
-	mux.HandleFunc("/analyze", analyzeHandler(sophrimClient, *ptsURL, store))
+	mux.HandleFunc("/analyze", analyzeHandler(sophrimClient, *ptsURL, store, ring))
 	mux.HandleFunc("/findings", findingsHandler(store))
 	mux.HandleFunc("/findings/", findingOutcomeHandler(store))
 	mux.HandleFunc("/metrics/detectors", detectorMetricsHandler(store))
+	mux.HandleFunc("/v1/debug/recent", handleDebugRecent(ring))
 
 	srv := &http.Server{
 		Addr:         *addr,
@@ -153,7 +157,7 @@ type analyzeResponse struct {
 	Report json.RawMessage `json:"report,omitempty"`
 }
 
-func analyzeHandler(sophrimClient *pipeline.SophrimClient, ptsEndpoint string, store *pipeline.OutcomeStore) http.HandlerFunc {
+func analyzeHandler(sophrimClient *pipeline.SophrimClient, ptsEndpoint string, store *pipeline.OutcomeStore, ring *DebugRing) http.HandlerFunc {
 	pjUnmarshaler := protojson.UnmarshalOptions{DiscardUnknown: true}
 	pjMarshaler := protojson.MarshalOptions{EmitUnpopulated: false}
 
@@ -184,6 +188,12 @@ func analyzeHandler(sophrimClient *pipeline.SophrimClient, ptsEndpoint string, s
 			return
 		}
 
+		// Compute input length (total chars across all turns) for the debug ring.
+		inputLen := 0
+		for _, t := range snap.GetTurns() {
+			inputLen += len(t.GetRawText())
+		}
+
 		// Resolve domain context: explicit > Sophrim fetch > nil.
 		var domain *pipeline.DomainContext
 		if req.DomainContext != nil {
@@ -206,9 +216,35 @@ func analyzeHandler(sophrimClient *pipeline.SophrimClient, ptsEndpoint string, s
 		elapsed := time.Since(start)
 
 		if err != nil {
+			ring.Record(PipelineLog{
+				Timestamp:   time.Now(),
+				InputLength: inputLen,
+				LatencyMs:   elapsed.Milliseconds(),
+				Status:      "error",
+				Error:       err.Error(),
+			})
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "pipeline error: " + err.Error()})
 			return
 		}
+
+		// Determine mode: "enriched" when ML enrichments are present, else "deterministic".
+		mode := "deterministic"
+		if len(result.MLEnrichments) > 0 {
+			mode = "enriched"
+		}
+		debugStatus := "ok"
+		if result.Rejected {
+			debugStatus = "rejected"
+		}
+		ring.Record(PipelineLog{
+			Timestamp:     time.Now(),
+			InputLength:   inputLen,
+			DetectorCount: len(result.Findings),
+			FindingsCount: len(result.Findings),
+			LatencyMs:     elapsed.Milliseconds(),
+			Mode:          mode,
+			Status:        debugStatus,
+		})
 
 		resp := analyzeResponse{
 			Variant:    pipeline.AdaptiveVariantName(domain),
