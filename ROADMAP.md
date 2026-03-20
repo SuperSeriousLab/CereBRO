@@ -9,6 +9,10 @@ Biomimetic 5-layer cognitive pipeline that detects reasoning failures in
 conversations. Domain-adaptive: modern analytical text (F1=0.91) and classical
 philosophical text (F1=0.45). Self-improving via the Lamarckian Loop.
 
+**Two Operating Modes:**
+- **Deterministic (default):** Pure fuzzy logic pipeline, zero external HTTP calls. Scope Guard uses topic lexicons + Jaccard distance.
+- **Enriched:** SLR + Sophrim active. Semantic similarity delegated to Sophrim (POST /semantic-similarity).
+
 ## Completed Phases
 
 | Phase | Name | Key Outcome |
@@ -21,6 +25,7 @@ philosophical text (F1=0.45). Self-improving via the Lamarckian Loop.
 | CORTEX 4 | Metacognition | Self-Confidence + Feedback (F1→0.91) |
 | CORTEX 5 | Memory | Salience Filter + Consolidator |
 | CORTEX 6 | Architecture Competition | D-inhibitor-only wins modern |
+| CORTEX 7 | Deterministic Mode | Scope Guard (topic lexicons + Jaccard), Contradiction Detector (precision 0%→100%), Multi-Project Hook, /v1/debug/recent |
 
 **Also complete (session work, not phased):**
 - Domain-adaptive variant selection (RunAdaptive)
@@ -30,6 +35,11 @@ philosophical text (F1=0.45). Self-improving via the Lamarckian Loop.
 - 2 Forge cycles: F1 0.434→0.496 (+14.3%)
 - Classical domain markers + formality fix + Porter-lite stemmer
 - forge-eval subprocess evaluator (7 evolvable parameters)
+- Deterministic mode (CEREBRO_MODE=deterministic): pure fuzzy, no external calls
+- Sophrim migration: LLM semantic similarity moved to Sophrim POST /semantic-similarity
+- Contradiction detector precision fix: multi-hypothesis scoring (0% → 100%)
+- Hook multi-project awareness: context-change decay for stale findings
+- Debug endpoint: /v1/debug/recent for stream of recent detections with salience
 
 ## Current Metrics
 
@@ -111,6 +121,7 @@ This is where fugo's P3.2 (Forge integration) and P2 (bandit learning) pay off.
 - **ML Enricher revival** — PURE pipeline wins. ML archived. Revisit only if dedicated GPU available.
 - **Real-time streaming** — Pipeline is batch (per-conversation). Streaming adds complexity without proportional value at current scale.
 - **Multi-language** — Language Detector exists but all detectors are English-only. Defer until non-English corpus exists.
+- **Enriched mode as default** — Deterministic mode (no SLR/Sophrim) is production default. Enriched mode available for advanced use cases.
 
 ## Code Stats
 
