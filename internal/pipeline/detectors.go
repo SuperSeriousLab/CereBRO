@@ -967,13 +967,144 @@ func weightedJaccardDivergence(a, b map[string]float64) float64 {
 	return 1.0 - minSum/maxSum
 }
 
+// topicLexicons defines keyword membership values (0–1) for common topic domains.
+// Each word's value is its fuzzy membership in that topic.
+var topicLexicons = map[string]map[string]float64{
+	"security": {
+		"auth": 1.0, "authentication": 1.0, "permission": 0.9, "permissions": 0.9,
+		"vulnerability": 1.0, "guard": 0.8, "policy": 0.9, "policies": 0.9,
+		"token": 0.9, "tokens": 0.9, "encrypt": 1.0, "encryption": 1.0,
+		"secret": 0.9, "credential": 1.0, "credentials": 1.0, "access": 0.7,
+		"firewall": 0.9, "certificate": 0.9, "tls": 1.0, "ssl": 1.0,
+	},
+	"performance": {
+		"timeout": 0.9, "latency": 1.0, "cache": 0.9, "caching": 0.9,
+		"memory": 0.8, "throughput": 1.0, "slow": 0.8, "bottleneck": 1.0,
+		"optimize": 0.9, "optimization": 0.9, "benchmark": 0.9, "profile": 0.8,
+		"cpu": 0.9, "heap": 0.8, "gc": 0.8, "goroutine": 0.7, "concurrency": 0.9,
+	},
+	"infrastructure": {
+		"deploy": 1.0, "deployment": 1.0, "container": 1.0, "service": 0.7,
+		"config": 0.8, "configuration": 0.8, "network": 0.9, "port": 0.8,
+		"server": 0.8, "docker": 1.0, "kubernetes": 1.0, "k8s": 1.0,
+		"systemd": 0.9, "lxc": 0.9, "proxmox": 0.9, "nats": 0.8, "redis": 0.8,
+	},
+	"quality": {
+		"test": 0.9, "tests": 0.9, "testing": 0.9, "coverage": 1.0,
+		"regression": 1.0, "bug": 1.0, "fix": 0.7, "error": 0.8,
+		"assertion": 0.9, "lint": 0.9, "review": 0.7, "ci": 0.9,
+		"unittest": 1.0, "integration": 0.7, "qa": 1.0,
+	},
+	"architecture": {
+		"design": 0.9, "pattern": 0.9, "patterns": 0.9, "interface": 0.9,
+		"interfaces": 0.9, "contract": 1.0, "contracts": 1.0, "migration": 0.9,
+		"refactor": 1.0, "refactoring": 1.0, "proto": 0.9, "protobuf": 0.9,
+		"schema": 0.8, "layer": 0.8, "pipeline": 0.8, "composition": 0.9,
+	},
+}
+
+// topicVector computes a per-topic membership sum for a bag of words.
+// For each word in words, its membership in each topic is accumulated.
+// The result is a map[topicName]sum suitable for fuzzy Jaccard comparison.
+func topicVector(words []string) map[string]float64 {
+	vec := make(map[string]float64, len(topicLexicons))
+	for _, word := range words {
+		w := strings.ToLower(word)
+		for topic, lexicon := range topicLexicons {
+			if mem, ok := lexicon[w]; ok {
+				vec[topic] += mem
+			}
+		}
+	}
+	return vec
+}
+
+// fuzzyTopicSimilarity computes semantic similarity between two texts using
+// fuzzy topic membership vectors. It extracts words from each text, builds
+// a per-topic membership sum for each, then computes fuzzy Jaccard similarity:
+//
+//	similarity = sum(min(ref_topic, win_topic)) / sum(max(ref_topic, win_topic))
+//
+// Returns -1 if either text produces an empty topic vector (insufficient domain
+// signal), allowing the caller to fall back to Jaccard.
+func fuzzyTopicSimilarity(refText, windowText string) float64 {
+	refWords := strings.Fields(refText)
+	winWords := strings.Fields(windowText)
+
+	refVec := topicVector(refWords)
+	winVec := topicVector(winWords)
+
+	// Both texts must produce domain signal. If either has no topic words,
+	// there is not enough information for a meaningful comparison — fall back.
+	if len(refVec) == 0 || len(winVec) == 0 {
+		return -1
+	}
+
+	// Collect all topic keys that appear in either vector.
+	allTopics := make(map[string]bool)
+	for t := range refVec {
+		allTopics[t] = true
+	}
+	for t := range winVec {
+		allTopics[t] = true
+	}
+
+	if len(allTopics) == 0 {
+		return -1 // no domain signal; caller should fall back
+	}
+
+	var minSum, maxSum float64
+	for t := range allTopics {
+		r, w := refVec[t], winVec[t]
+		if r < w {
+			minSum += r
+			maxSum += w
+		} else {
+			minSum += w
+			maxSum += r
+		}
+	}
+	if maxSum == 0 {
+		return -1 // no signal; fall back
+	}
+	return minSum / maxSum
+}
+
 // scopeDivergence returns a drift distance in [0,1] for one window evaluation.
-// Primary: calls SLR (OpenAI-compat) to get semantic similarity between the
-// reference scope text and the current window text, converts to divergence
-// (1 – similarity).  On any SLR error it falls back to weightedJaccardDivergence.
+// In deterministic mode (SLREndpoint == ""), the distance is the maximum of
+// fuzzy topic divergence and weighted Jaccard divergence — combining both
+// signals conservatively (higher divergence wins, preserving recall).
+// In enriched mode (SLREndpoint != ""), SLR semantic similarity is used as
+// the primary measure, falling back to Jaccard on any SLR error.
 func scopeDivergence(refFreq, windowFreq map[string]float64, objectiveKW []string, turnKWs [][]string, winStart, winEnd int, cfg ScopeGuardConfig) float64 {
 	if cfg.SLREndpoint == "" {
-		return weightedJaccardDivergence(refFreq, windowFreq)
+		// Deterministic mode: compute fuzzy topic divergence and Jaccard,
+		// return their maximum (most sensitive / conservative combination).
+		jaccardDiv := weightedJaccardDivergence(refFreq, windowFreq)
+
+		// Build text representations for fuzzy topic analysis.
+		refParts := make([]string, 0, len(objectiveKW)+len(refFreq))
+		refParts = append(refParts, objectiveKW...)
+		for k := range refFreq {
+			refParts = append(refParts, k)
+		}
+		var winParts []string
+		for j := winStart; j <= winEnd; j++ {
+			if j < len(turnKWs) {
+				winParts = append(winParts, turnKWs[j]...)
+			}
+		}
+		sim := fuzzyTopicSimilarity(strings.Join(refParts, " "), strings.Join(winParts, " "))
+		if sim < 0 {
+			// No domain signal — pure Jaccard.
+			return jaccardDiv
+		}
+		fuzzyDiv := 1.0 - sim
+		// Return the higher of the two divergence measures (more sensitive).
+		if fuzzyDiv > jaccardDiv {
+			return fuzzyDiv
+		}
+		return jaccardDiv
 	}
 
 	// Build human-readable reference text from objective keywords + refFreq keys.

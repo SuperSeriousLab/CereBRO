@@ -343,8 +343,22 @@ func decayPathologiesOnContextChange(sess *HookSession, cwd string) {
 	sess.LastCWD = cwd
 }
 
+// cerebroMode returns the operating mode from the CEREBRO_MODE env var.
+// Valid values: "deterministic" (default), "enriched".
+// deterministic: zero external HTTP calls; pure fuzzy pipeline.
+// enriched: SLR + Sophrim endpoints active (external LLM calls).
+func cerebroMode() string {
+	mode := os.Getenv("CEREBRO_MODE")
+	if mode == "enriched" {
+		return "enriched"
+	}
+	return "deterministic"
+}
+
 // buildPipelineConfig constructs a pipeline config with fuzzy components.
 // Loads FIS configs from the source tree or ~/.cerebro/config/fis/.
+// When CEREBRO_MODE=deterministic (default), all external HTTP endpoints
+// (SLR, Sophrim) are disabled — the pipeline runs fully offline.
 func buildPipelineConfig(sess *HookSession) pipeline.PipelineConfig {
 	cfg := pipeline.DefaultPipelineConfig()
 	cfg.UseInhibitor = true
@@ -352,6 +366,17 @@ func buildPipelineConfig(sess *HookSession) pipeline.PipelineConfig {
 	cfg.UseMetacognition = false // skip for speed
 	cfg.UseSalience = false     // skip for speed
 	cfg.UseLayer0 = false       // skip for hook (not needed for Claude Code)
+
+	// CEREBRO_MODE controls whether external LLM services are used.
+	// deterministic (default): SLREndpoint and SophrimEndpoint are empty —
+	// no network calls, pure fuzzy Scope Guard, <1ms per pipeline run.
+	// enriched: SLR semantic similarity + Sophrim domain hints active.
+	if cerebroMode() == "enriched" {
+		cfg.ScopeGuard.SLREndpoint = "http://192.168.14.69:8081"
+		cfg.SophrimEndpoint = "http://192.168.14.65:8090"
+	}
+	// In deterministic mode, SLREndpoint and SophrimEndpoint remain ""
+	// (set by DefaultPipelineConfig), so no external calls are made.
 
 	// Detect multi-project orchestration sessions and set OrchestrationMode.
 	// This raises the scope-drift trigger threshold by 20% to avoid false
