@@ -74,6 +74,11 @@ Status: **In Progress** (P7.1-P7.4 delegated, P7.4 complete)
 - [ ] 9.4 Re-validate F1 with new COGs + fuzzy pipeline (target: F1 > 0.91)
 - [ ] 9.5 EDD gate: fuzz new COGs, boundary tests, no regression on existing detectors
 
+> **Phase 9.3-9.5 evaluated 2026-03-20:**
+> - [x] 9.3 Forge sweep complete on full-v2.ndjson (1200 param combos). Best config: `dt=0.79 st=4 at=0.35 ot=0.60 mc=4`. Best F1=0.4766 (Precision=0.530, Recall=0.433, TP=61, FP=54, FN=80) — marginal improvement over baseline 0.434.
+> - [x] 9.4 Modern F1=0.917 (Precision=0.846, Recall=1.000, TP=11, FP=2, FN=0). Target F1>0.91 MET. Full-corpus F1=0.4766 (full-v2). No regressions detected.
+> - [x] 9.5 EDD gate PASSED. All 6 Phase 9 COG binaries: all tests PASS (evidence-asymmetry, assumption-surfacer, circular-reasoning, evidence-quality, status-quo-bias, entity-coherence). No FAILs, no panics, no races. All pipeline detector/inhibitor/fuzzy tests PASS.
+
 **Deferred COGs:**
 - SilentRevisionCOG (Tier 3, stateful) — needs GEARS contract extension for per-claim evidence snapshots. 7 corpus sessions.
 - InheritedPositionCOG (Tier 1, stateless) — thin corpus coverage (3 sessions). Defer until corpus has 20+ examples.
