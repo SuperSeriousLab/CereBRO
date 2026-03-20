@@ -8,6 +8,8 @@ VERIFIED_DIR="$CEREBRO_DIR/data/generation/verified/$DATE"
 DISAGREED_DIR="$CEREBRO_DIR/data/generation/disagreements/$DATE"
 UNCERTAIN_DIR="$CEREBRO_DIR/data/generation/uncertain/$DATE"
 SLR_ENDPOINT="${SLR_ENDPOINT:-http://192.168.14.69:8081}"
+XAI_ENDPOINT="${XAI_ENDPOINT:-https://api.x.ai}"
+XAI_MODEL="${XAI_MODEL:-grok-4-1-fast-non-reasoning}"
 PROMPT_TEMPLATE="$CEREBRO_DIR/data/generation/verify-prompt.txt"
 
 mkdir -p "$VERIFIED_DIR" "$DISAGREED_DIR" "$UNCERTAIN_DIR"
@@ -40,11 +42,12 @@ for finding in "$FINDINGS_DIR"/*.json; do
     PROMPT="${PROMPT//\{\{CONFIDENCE\}\}/$CONFIDENCE}"
     PROMPT="${PROMPT//\{\{EXPLANATION\}\}/$EXPLANATION}"
 
-    # Send to Grok via SLR (cx=0.95 forces quality tier)
-    RESPONSE=$(curl -s --max-time 60 -X POST "$SLR_ENDPOINT/v1/chat/completions" \
+    # Send to Grok directly via xAI API (bypasses SLR hot queue)
+    RESPONSE=$(curl -s --max-time 60 -X POST "$XAI_ENDPOINT/v1/chat/completions" \
       -H "Content-Type: application/json" \
-      -d "$(jq -n --arg prompt "$PROMPT" '{
-          "model": "auto:cx=0.95",
+      -H "Authorization: Bearer ${XAI_API_KEY:-}" \
+      -d "$(jq -n --arg prompt "$PROMPT" --arg model "$XAI_MODEL" '{
+          "model": $model,
           "messages": [{"role": "user", "content": $prompt}],
           "temperature": 0.0,
           "max_tokens": 200
