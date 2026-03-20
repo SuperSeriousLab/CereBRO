@@ -29,6 +29,14 @@ if [[ "$QUEUE_SIZE" -ge "$HALF_CAP" ]]; then
     exit 0
 fi
 
+# Check hot queue backpressure
+HOT_SIZE=$(echo "$STATUS" | jq -r '.hot_queue.size // 0')
+HOT_QUEUE_BACKPRESSURE_THRESHOLD=${HOT_QUEUE_BACKPRESSURE_THRESHOLD:-20}
+if [[ "$HOT_SIZE" -ge "$HOT_QUEUE_BACKPRESSURE_THRESHOLD" ]]; then
+    echo "[SKIP] SLR hot queue at $HOT_SIZE (>= $HOT_QUEUE_BACKPRESSURE_THRESHOLD) — backing off" | tee -a "$LOG_DIR/feeder.log"
+    exit 0
+fi
+
 # Select random prompts
 PROMPTS=($(ls "$PROMPT_DIR"/*.txt 2>/dev/null | shuf | head -$BATCH_SIZE))
 if [[ ${#PROMPTS[@]} -eq 0 ]]; then
