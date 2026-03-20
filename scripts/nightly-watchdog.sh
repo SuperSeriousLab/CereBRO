@@ -4,6 +4,7 @@ set -euo pipefail
 DATE=$(date +%Y-%m-%d)
 CEREBRO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 LOG_DIR="$CEREBRO_DIR/data/generation/logs/$DATE"
+CONV_DIR="$CEREBRO_DIR/data/generation/output/$DATE"
 ALERT_FILE="$LOG_DIR/watchdog-alert.md"
 PROBLEMS=0
 
@@ -20,7 +21,7 @@ rm -f "$ALERT_FILE"
 
 check "Run exists" "[[ -d '$LOG_DIR' ]]" "No nightly directory. Cron may not have fired."
 check "Report exists" "[[ -f '$LOG_DIR/morning-report.md' ]]" "No morning report. Loop may have crashed."
-check "Conversations generated" "[[ \$(ls '$LOG_DIR/conversations'/*.json 2>/dev/null | wc -l) -gt 0 ]]" "Zero conversations."
+check "Conversations generated" "[[ \$(ls '$CONV_DIR'/*.json 2>/dev/null | wc -l) -gt 0 ]]" "Zero conversations."
 check "No stale lock" "[[ ! -f /tmp/cerebro-nightly.lock ]] || ! kill -0 \$(cat /tmp/cerebro-nightly.lock 2>/dev/null) 2>/dev/null" "Lock file exists but process dead."
 check "Ollama" "curl -sf --max-time 5 http://10.70.70.14:11434/api/tags > /dev/null 2>&1" "Ollama unreachable."
 check "SLR" "curl -sf --max-time 5 http://192.168.14.69:8080/health > /dev/null 2>&1" "SLR unreachable."
