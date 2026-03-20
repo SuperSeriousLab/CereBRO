@@ -97,10 +97,27 @@ Status: **In Progress** (P7.1-P7.4 delegated, P7.4 complete)
 
 ### Phase 10: Cross-Domain — Code Review Deployment
 
-- [ ] 10.1 Adapt pipeline for code review conversations (PR reviews, architecture discussions)
+- [x] 10.1 Adapt pipeline for code review conversations (PR reviews, architecture discussions)
+      - Added `isCodeReview()` to DomainContext (PrimaryDomain="code-review", Confidence>0.6)
+      - applyDomainContext: DriftThreshold=0.85, SustainedTurns=3, SkipAnchoring=true, MinCertaintyWords=3
+      - RunAdaptive wired: code-review → D-inhibitor-only + domain adjustments
+      - 15 new tests covering isCodeReview, applyDomainContext, pipeline integration, RunAdaptive
+      - Zero regression on modern F1 (full pipeline test suite PASS)
 - [ ] 10.2 Generate code-review-specific corpus (50+ conversations)
+      **What's needed:** Use SLR/Ollama to generate 50+ PR review and architecture discussion
+      conversations with injected pathologies (anchoring bias on PR estimates, scope creep
+      in architecture reviews, sunk-cost in refactoring decisions, contradiction between
+      reviewer turns). Label each with expected FindingTypes. Store in
+      data/corpus/code-review-v1.ndjson matching the existing NDJSON format.
 - [ ] 10.3 Calibrate detector thresholds for code review domain (Forge-evolve FIS configs)
+      **What's needed:** Once corpus exists, run forge-eval on code-review-v1.ndjson to
+      tune DriftThreshold (currently 0.85, conservative initial value), SustainedTurns (3),
+      and MinCertaintyWords (3). The 7 evolvable parameters in forge-eval apply. Target F1>0.85
+      on code-review corpus.
 - [ ] 10.4 Deploy code review mode alongside conversation mode
+      **What's needed:** Update cerebro-hook binary to detect code-review context (e.g. from
+      file names in CLAUDE_CONTEXT: *.go, *.rs, diff output) and set DomainContext accordingly.
+      Update SLR hint parser to recognize code-review domain signals.
 
 **Exit:** CereBRO handles both conversational and code review reasoning detection.
 

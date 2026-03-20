@@ -252,3 +252,185 @@ func TestPipeline_classicalDomain_configFields(t *testing.T) {
 		t.Errorf("Calibrator.MinCertaintyWords: want 8, got %d", cfg.Calibrator.MinCertaintyWords)
 	}
 }
+
+// ─── isCodeReview ─────────────────────────────────────────────────────────────
+
+func TestDomainContext_isCodeReview_nil(t *testing.T) {
+	var dc *DomainContext
+	if dc.isCodeReview() {
+		t.Fatal("nil DomainContext should not be code-review")
+	}
+}
+
+func TestDomainContext_isCodeReview_wrongDomain(t *testing.T) {
+	dc := &DomainContext{PrimaryDomain: "technical", Confidence: 0.9}
+	if dc.isCodeReview() {
+		t.Fatal("domain 'technical' should not match code-review")
+	}
+}
+
+func TestDomainContext_isCodeReview_lowConfidence(t *testing.T) {
+	dc := &DomainContext{PrimaryDomain: "code-review", Confidence: 0.3}
+	if dc.isCodeReview() {
+		t.Fatal("low confidence code-review should not qualify")
+	}
+}
+
+func TestDomainContext_isCodeReview_atThreshold(t *testing.T) {
+	// Exactly at threshold (0.6) — must NOT qualify (condition is strictly >)
+	dc := &DomainContext{PrimaryDomain: "code-review", Confidence: 0.6}
+	if dc.isCodeReview() {
+		t.Fatal("confidence exactly at threshold should not qualify")
+	}
+}
+
+func TestDomainContext_isCodeReview_aboveThreshold(t *testing.T) {
+	dc := &DomainContext{PrimaryDomain: "code-review", Confidence: 0.85}
+	if !dc.isCodeReview() {
+		t.Fatal("high-confidence code-review should be recognised")
+	}
+}
+
+// ─── applyDomainContext — code review ─────────────────────────────────────────
+
+func TestApplyDomainContext_codeReview_driftThresholdRaised(t *testing.T) {
+	cfg := DefaultPipelineConfig()
+	cfg.DomainContext = &DomainContext{PrimaryDomain: "code-review", Confidence: 0.85}
+
+	out := applyDomainContext(cfg)
+
+	if out.ScopeGuard.DriftThreshold != 0.85 {
+		t.Errorf("code-review domain: expected DriftThreshold=0.85, got %.2f", out.ScopeGuard.DriftThreshold)
+	}
+}
+
+func TestApplyDomainContext_codeReview_sustainedTurnsLowered(t *testing.T) {
+	cfg := DefaultPipelineConfig()
+	cfg.DomainContext = &DomainContext{PrimaryDomain: "code-review", Confidence: 0.85}
+
+	out := applyDomainContext(cfg)
+
+	if out.ScopeGuard.SustainedTurns != 3 {
+		t.Errorf("code-review domain: expected SustainedTurns=3, got %d", out.ScopeGuard.SustainedTurns)
+	}
+}
+
+func TestApplyDomainContext_codeReview_skipAnchoring(t *testing.T) {
+	cfg := DefaultPipelineConfig()
+	cfg.DomainContext = &DomainContext{PrimaryDomain: "code-review", Confidence: 0.85}
+
+	out := applyDomainContext(cfg)
+
+	if !out.SkipAnchoring {
+		t.Error("code-review domain: expected SkipAnchoring=true (numeric literals are not anchoring signals)")
+	}
+}
+
+func TestApplyDomainContext_codeReview_minCertaintyWordsLowered(t *testing.T) {
+	cfg := DefaultPipelineConfig()
+	cfg.DomainContext = &DomainContext{PrimaryDomain: "code-review", Confidence: 0.85}
+
+	out := applyDomainContext(cfg)
+
+	if out.Calibrator.MinCertaintyWords != 3 {
+		t.Errorf("code-review domain: expected MinCertaintyWords=3, got %d", out.Calibrator.MinCertaintyWords)
+	}
+}
+
+func TestApplyDomainContext_codeReview_noChangeOnLowConfidence(t *testing.T) {
+	cfg := DefaultPipelineConfig()
+	defaultDrift := DefaultScopeGuardConfig().DriftThreshold
+	cfg.DomainContext = &DomainContext{PrimaryDomain: "code-review", Confidence: 0.3}
+
+	out := applyDomainContext(cfg)
+
+	if out.ScopeGuard.DriftThreshold != defaultDrift {
+		t.Errorf("low-confidence code-review: DriftThreshold should be unchanged %.2f, got %.2f",
+			defaultDrift, out.ScopeGuard.DriftThreshold)
+	}
+	if out.SkipAnchoring {
+		t.Error("low-confidence code-review: SkipAnchoring should be false")
+	}
+}
+
+// TestApplyDomainContext_codeReview_classicalTakesPrecedence verifies that when
+// a context has both classical TextEra and code-review PrimaryDomain, classical
+// adjustments apply (classical is checked first).
+func TestApplyDomainContext_codeReview_classicalTakesPrecedence(t *testing.T) {
+	cfg := DefaultPipelineConfig()
+	cfg.DomainContext = &DomainContext{
+		PrimaryDomain: "code-review",
+		TextEra:       "classical",
+		Confidence:    0.85,
+	}
+
+	out := applyDomainContext(cfg)
+
+	// Classical branch fires first: DriftThreshold=0.70, SustainedTurns=4,
+	// MinCertaintyWords=8.
+	if out.ScopeGuard.DriftThreshold != 0.70 {
+		t.Errorf("classical takes precedence: expected DriftThreshold=0.70, got %.2f", out.ScopeGuard.DriftThreshold)
+	}
+	if out.Calibrator.MinCertaintyWords != 8 {
+		t.Errorf("classical takes precedence: expected MinCertaintyWords=8, got %d", out.Calibrator.MinCertaintyWords)
+	}
+}
+
+// ─── Pipeline integration — code review domain ────────────────────────────────
+
+// TestPipeline_codeReviewDomain_anchoringSkipped verifies that when a code-review
+// DomainContext is set, the anchoring detector does not appear in the detector map
+// even though the conversation has numeric tokens.
+func TestPipeline_codeReviewDomain_anchoringSkipped(t *testing.T) {
+	snap := makeSnapWithNumerics()
+
+	cfg := DefaultPipelineConfig()
+	cfg.DomainContext = &DomainContext{PrimaryDomain: "code-review", Confidence: 0.85}
+
+	result := Run(snap, cfg)
+
+	for _, f := range result.Findings {
+		if f.GetDetectorName() == "anchoring-detector" {
+			t.Errorf("code-review domain: anchoring-detector should be skipped, but finding was produced")
+		}
+	}
+}
+
+// TestPipeline_codeReviewDomain_noPanic verifies the pipeline runs to completion
+// with a code-review DomainContext (smoke test).
+func TestPipeline_codeReviewDomain_noPanic(t *testing.T) {
+	snap := makeSnapWithNumerics()
+	cfg := DefaultPipelineConfig()
+	cfg.DomainContext = &DomainContext{PrimaryDomain: "code-review", Confidence: 0.85}
+
+	result := Run(snap, cfg)
+
+	if result == nil {
+		t.Fatal("Run returned nil for code-review domain")
+	}
+}
+
+// TestRunAdaptive_codeReview_usesInhibitorVariant verifies that code-review domain
+// routes to D-inhibitor-only (same variant as modern, with adjusted thresholds).
+func TestRunAdaptive_codeReview_usesInhibitorVariant(t *testing.T) {
+	snap := makeSnapWithNumerics()
+	dc := &DomainContext{PrimaryDomain: "code-review", Confidence: 0.85}
+
+	name := AdaptiveVariantName(dc)
+	if name != "D-inhibitor-only" {
+		t.Errorf("code-review domain: want D-inhibitor-only, got %s", name)
+	}
+
+	result, err := RunAdaptive(snap, dc, "")
+	if err != nil {
+		t.Fatalf("RunAdaptive error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("RunAdaptive returned nil")
+	}
+
+	// D-inhibitor-only always runs the inhibitor.
+	if result.Inhibition == nil {
+		t.Error("code-review → D-inhibitor-only: Inhibition should be non-nil")
+	}
+}
