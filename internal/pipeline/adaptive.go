@@ -13,6 +13,7 @@ package pipeline
 
 import (
 	"errors"
+	"os"
 
 	reasoningv1 "github.com/SuperSeriousLab/CereBRO/gen/go/cog/reasoning/v1"
 )
@@ -39,6 +40,8 @@ import (
 // ptsEndpoint (optional) enables fire-and-forget PTS anomaly signals. Pass ""
 // to disable. Mirrors the PTSEndpoint field on PipelineConfig.
 // store (optional variadic) enables outcome recording for TP/FP tracking.
+// slrVerifyEndpoint (optional) enables Stage 12 finding verification via SLR/Grok.
+// Pass "" to disable.
 func RunAdaptive(snap *reasoningv1.ConversationSnapshot, domain *DomainContext, ptsEndpoint string, store ...*OutcomeStore) (*PipelineResult, error) {
 	if snap == nil {
 		return nil, errors.New("RunAdaptive: snap must not be nil")
@@ -66,8 +69,28 @@ func RunAdaptive(snap *reasoningv1.ConversationSnapshot, domain *DomainContext, 
 		cfg.OutcomeStore = store[0]
 	}
 
+	// Wire SLR verify endpoint for Stage 12 finding verification (from env var).
+	// Override via SLR_VERIFY_ENDPOINT environment variable.
+	cfg.VerifyFindings = VerifyFindingsConfig{
+		SLREndpoint: slrVerifyEndpointDefault(),
+	}
+
 	result := Run(snap, cfg)
 	return result, nil
+}
+
+// slrVerifyEndpointDefault returns the SLR endpoint for finding verification.
+// Override with SLR_VERIFY_ENDPOINT environment variable.
+// Defaults to the standard SLR gateway at 192.168.14.69:8081.
+// Returns "" when the env var is explicitly set to "disabled".
+func slrVerifyEndpointDefault() string {
+	if ep := os.Getenv("SLR_VERIFY_ENDPOINT"); ep != "" {
+		if ep == "disabled" {
+			return ""
+		}
+		return ep
+	}
+	return "http://192.168.14.69:8081"
 }
 
 // AdaptiveVariantName returns the name of the variant that RunAdaptive would

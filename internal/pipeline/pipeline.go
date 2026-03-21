@@ -78,6 +78,11 @@ type PipelineConfig struct {
 	// and never block the pipeline. Populate via NewOutcomeStore().
 	OutcomeStore *OutcomeStore
 
+	// VerifyFindings configures optional Grok-via-SLR post-pipeline verification.
+	// When SLREndpoint is non-empty, each finding is verified by Grok and the
+	// outcome is posted back to SLR /v1/feedback (fire-and-forget goroutine).
+	VerifyFindings VerifyFindingsConfig
+
 	// Logger is an optional zerolog.Logger for structured training data events.
 	// When set, a single "cerebro_pipeline_run" Info event is emitted at the
 	// end of every Run() call with full pipeline telemetry.
@@ -477,6 +482,10 @@ func Run(snap *reasoningv1.ConversationSnapshot, cfg PipelineConfig) *PipelineRe
 			Bool("consolidated", result.Consolidated).
 			Msg("pipeline: run logged")
 	}
+
+	// Stage 12: Verify findings via SLR/Grok and post outcome feedback (fire-and-forget).
+	// Only runs when VerifyFindings.SLREndpoint is configured and there are findings to verify.
+	VerifyFindings(result.Findings, snap, cfg.VerifyFindings)
 
 	return result
 }
