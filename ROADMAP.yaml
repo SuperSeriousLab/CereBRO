@@ -1,0 +1,198 @@
+project: CereBRO
+description: Biomimetic 5-layer cognitive pipeline for reasoning failure detection (Go, deterministic fuzzy)
+phases:
+  - id: cognitive-1
+    name: "Core Detectors"
+    status: completed
+    depends_on: []
+    items:
+      - name: "Anchoring bias detector"
+        done: true
+      - name: "Sunk-cost bias detector"
+        done: true
+      - name: "Intake COG"
+        done: true
+      - name: "Aggregator COG"
+        done: true
+
+  - id: cognitive-2
+    name: "Full Tier 1"
+    status: completed
+    depends_on: [cognitive-1]
+    items:
+      - name: "11 COGs deployed"
+        done: true
+      - name: "Router"
+        done: true
+      - name: "Gateway"
+        done: true
+
+  - id: cortex-1
+    name: "Context Inhibitor"
+    status: completed
+    depends_on: [cognitive-2]
+    items:
+      - name: "Context inhibitor (precision 0.43 → 0.82)"
+        done: true
+
+  - id: cortex-2
+    name: "Urgency + Modulation"
+    status: completed
+    depends_on: [cortex-1]
+    items:
+      - name: "Urgency assessment → GainSignal"
+        done: true
+      - name: "Threshold adaptation"
+        done: true
+
+  - id: cortex-3
+    name: "Layer 0 Reflexes"
+    status: completed
+    depends_on: [cortex-2]
+    items:
+      - name: "Format gate (Layer 0)"
+        done: true
+      - name: "Toxicity gate (Layer 0)"
+        done: true
+      - name: "Language gate (Layer 0)"
+        done: true
+
+  - id: cortex-4
+    name: "Metacognition"
+    status: completed
+    depends_on: [cortex-3]
+    items:
+      - name: "Self-Confidence assessor (F1 → 0.91)"
+        done: true
+      - name: "Feedback evaluator"
+        done: true
+
+  - id: cortex-5
+    name: "Memory"
+    status: completed
+    depends_on: [cortex-4]
+    items:
+      - name: "Salience Filter"
+        done: true
+      - name: "Consolidator"
+        done: true
+
+  - id: cortex-6
+    name: "Architecture Competition"
+    status: completed
+    depends_on: [cortex-5]
+    items:
+      - name: "D-inhibitor-only wins modern analytical corpus"
+        done: true
+      - name: "Architecture competition runner + scoring"
+        done: true
+
+  - id: cortex-7
+    name: "Deterministic Mode"
+    status: completed
+    depends_on: [cortex-6]
+    items:
+      - name: "Scope Guard (topic lexicons + fuzzy Jaccard)"
+        done: true
+      - name: "Contradiction Detector (precision 0% → 100%)"
+        done: true
+      - name: "Multi-Project Hook"
+        done: true
+      - name: "/v1/debug/recent endpoint"
+        done: true
+      - name: "Domain-adaptive variant selection (RunAdaptive)"
+        done: true
+      - name: "2 Tier 2 COGs: Conceptual Anchoring, Inherited-Position"
+        done: true
+      - name: "Lamarckian Loop: all 3 connections wired (A: feedback, B: domain hints, C: forge ingestion)"
+        done: true
+      - name: "Nightly Loop automation: 3 batches (generator, verifier, orchestrator, watchdog)"
+        done: true
+      - name: "Classical domain markers + formality fix + Porter-lite stemmer"
+        done: true
+      - name: "forge-eval subprocess evaluator (7 evolvable parameters)"
+        done: true
+      - name: "Deterministic mode (CEREBRO_MODE=deterministic)"
+        done: true
+      - name: "Sophrim migration: LLM semantic similarity moved to Sophrim POST /semantic-similarity"
+        done: true
+      - name: "Hook multi-project awareness with context-change decay"
+        done: true
+
+  - id: phase-7
+    name: "Production Deployment"
+    status: in-progress
+    depends_on: [cortex-7]
+    items:
+      - name: "7.1 Provision LXC container on Proxmox"
+        done: true
+      - name: "7.2 Build and deploy CereBRO gRPC service with fugo fuzzy components"
+        done: true
+      - name: "7.3 Nightly cron pipeline execution (persist findings)"
+        done: false
+      - name: "7.4 Replace FuzzyGuard hooks with cerebro-hook binary (536us pipeline, 11 tests)"
+        done: true
+      - name: "7.5 Stability gate — 7 consecutive nightly runs without failure"
+        done: false
+      - name: "7.6 Deploy skill and service registry update"
+        done: false
+
+  - id: phase-8
+    name: "Corpus Expansion"
+    status: not-started
+    depends_on: [phase-7]
+    items:
+      - name: "8.1 Generate 300+ new conversations via SLR (diverse topics, all 4 novel pathology types)"
+        done: false
+      - name: "8.2 Import to shared corpus format (CereBRO + FuzzyGuard + DORIANG compatible)"
+        done: false
+      - name: "8.3 Re-run Genesis on expanded corpus — discover new patterns"
+        done: false
+      - name: "8.4 EDD gate: validate expanded corpus quality"
+        done: false
+
+  - id: phase-9
+    name: "Genesis COG Graduates"
+    status: in-progress
+    depends_on: [phase-8]
+    items:
+      - name: "9.1 CounterEvidenceDepletionCOG (Tier 2, stateless)"
+        done: false
+      - name: "9.2 DirectionalLockCOG (Tier 2, stateless)"
+        done: false
+      - name: "9.3 Forge-evolve fugo FIS configs for new COGs on expanded corpus"
+        done: true
+      - name: "9.4 Re-validate F1 with new COGs + fuzzy pipeline (target: F1 > 0.91)"
+        done: true
+      - name: "9.5 EDD gate: fuzz new COGs, boundary tests, no regression"
+        done: true
+
+  - id: phase-10
+    name: "Cross-Domain — Code Review Deployment"
+    status: in-progress
+    depends_on: [phase-7]
+    items:
+      - name: "10.1 Adapt pipeline for code review conversations (isCodeReview domain detection)"
+        done: true
+      - name: "10.2 Generate code-review-specific corpus (50+ conversations)"
+        done: false
+      - name: "10.3 Calibrate detector thresholds for code review domain (Forge-evolve FIS configs)"
+        done: false
+      - name: "10.4 Deploy code review mode alongside conversation mode"
+        done: false
+
+  - id: phase-11
+    name: "Forge Evolution + Online Learning"
+    status: not-started
+    depends_on: [phase-8]
+    items:
+      - name: "11.1 Forge-evolve ALL fugo FIS configs on 500+ corpus (offline optimization)"
+        done: false
+      - name: "11.2 Compare Forge-evolved vs hand-tuned FIS on held-out test set"
+        done: false
+      - name: "11.3 Activate fugo bandit online learning in production"
+        done: false
+      - name: "11.4 Measure F1 improvement over 30 days of online learning"
+        done: false
+      - name: "11.5 EDD gate: verify no drift, no degradation, bandit convergence"
+        done: false
