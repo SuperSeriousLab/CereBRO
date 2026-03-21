@@ -174,6 +174,8 @@ type PipelineResult struct {
 //	Stage 7:   Feedback Evaluator (bounded re-evaluation loop) — Phase 4
 //	Stage 8:   Memory Consolidator (sparse indexing → corpus) — Phase 5
 func Run(snap *reasoningv1.ConversationSnapshot, cfg PipelineConfig) *PipelineResult {
+	runStart := time.Now()
+
 	// Stage 0: Layer 0 Reflexes (Phase 3)
 	if cfg.UseLayer0 {
 		l0 := RunLayer0(snap, cfg.Layer0)
@@ -184,6 +186,8 @@ func Run(snap *reasoningv1.ConversationSnapshot, cfg PipelineConfig) *PipelineRe
 			}
 			// PTS anomaly signal for Layer 0 rejection (fire-and-forget).
 			maybeSendPTSSignals(rejected, cfg.PTSEndpoint)
+			// Stage 13: PTS pipeline outcome (fire-and-forget, even for rejections).
+			maybeSendPTSOutcome(rejected, cfg.PTSEndpoint, time.Since(runStart).Milliseconds())
 			return rejected
 		}
 	}
@@ -486,6 +490,11 @@ func Run(snap *reasoningv1.ConversationSnapshot, cfg PipelineConfig) *PipelineRe
 	// Stage 12: Verify findings via SLR/Grok and post outcome feedback (fire-and-forget).
 	// Only runs when VerifyFindings.SLREndpoint is configured and there are findings to verify.
 	VerifyFindings(result.Findings, snap, cfg.VerifyFindings)
+
+	// Stage 13: PTS pipeline outcome event (fire-and-forget).
+	// Reports completion telemetry (findings count, detectors fired, duration, integrity score)
+	// to PTS /cog/signal after every successful pipeline run.
+	maybeSendPTSOutcome(result, cfg.PTSEndpoint, time.Since(runStart).Milliseconds())
 
 	return result
 }

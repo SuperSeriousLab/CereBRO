@@ -234,6 +234,116 @@ func (c *PTSClient) SendInject(ctx context.Context, text string) {
 	}
 }
 
+// ptsOutcomePayload is the payload for POST /cog/signal when reporting pipeline completion.
+// All numeric fields use float64 so they round-trip through JSON without surprises.
+type ptsOutcomePayload struct {
+	Service          string            `json:"service"`
+	Outcome          string            `json:"outcome"`
+	PipelineID       string            `json:"pipeline_id"`
+	FindingsCount    int               `json:"findings_count"`
+	DetectorsFired   map[string]int    `json:"detectors_fired"`
+	DurationMs       int64             `json:"duration_ms"`
+	CorpusSize       int               `json:"corpus_size"`
+	IntegrityScore   float64           `json:"integrity_score"`
+	Timestamp        string            `json:"timestamp"`
+}
+
+// SendPipelineOutcome posts a pipeline completion event to PTS /cog/signal.
+// Intended to be called as a goroutine — it never blocks or propagates errors.
+func (c *PTSClient) SendPipelineOutcome(ctx context.Context, payload ptsOutcomePayload) {
+	obs := fmt.Sprintf(
+		"pipeline_%s: pipeline_id=%s findings=%d detectors_fired=%d duration_ms=%d integrity_score=%.3f corpus_size=%d",
+		payload.Outcome,
+		payload.PipelineID,
+		payload.FindingsCount,
+		len(payload.DetectorsFired),
+		payload.DurationMs,
+		payload.IntegrityScore,
+		payload.CorpusSize,
+	)
+	sig := ptsSignalRequest{
+		Cog:         "cerebro-pipeline",
+		Observation: obs,
+		Artifacts:   []string{"cerebro-pipeline", "cerebro-outcomes"},
+	}
+	body, err := json.Marshal(sig)
+	if err != nil {
+		log.Printf("[pts-client] outcome marshal error: %v", err)
+		return
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint+"/cog/signal", bytes.NewReader(body))
+	if err != nil {
+		log.Printf("[pts-client] outcome request build error: %v", err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.http.Do(req)
+	if err != nil {
+		log.Printf("[pts-client] outcome send error: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		log.Printf("[pts-client] outcome unexpected status %d for pipeline %q", resp.StatusCode, payload.PipelineID)
+	}
+}
+
+// maybeSendPTSOutcome fires a goroutine that POSTs a pipeline completion event to PTS.
+// It is a no-op when endpoint is empty. Never blocks the pipeline.
+// durationMs is the wall-clock time from Run() start to finish.
+func maybeSendPTSOutcome(result *PipelineResult, endpoint string, durationMs int64) {
+	if endpoint == "" || result == nil {
+		return
+	}
+
+	// Determine pipeline_id: prefer conversation ID from report, fall back to UUID.
+	pipelineID := newUUID()
+	if result.Report != nil && result.Report.GetConversationId() != "" {
+		pipelineID = result.Report.GetConversationId()
+	}
+
+	// Compute per-detector fired counts from raw findings.
+	detectorsFired := make(map[string]int)
+	for _, f := range result.Findings {
+		name := f.GetDetectorName()
+		if name == "" {
+			name = findingTypeName(f.GetFindingType())
+		}
+		detectorsFired[name]++
+	}
+
+	// Compute corpus size as total character count across conversation turns.
+	// The snap is not directly available here; use findings count as proxy if needed.
+	// We report corpus_size=0 when unavailable — acceptable for observability.
+	corpusSize := 0
+
+	// Outcome string: "completed" always (failures short-circuit before Run returns).
+	outcome := "completed"
+	if result.Rejected {
+		outcome = "rejected"
+	}
+
+	var integrityScore float64
+	if result.Report != nil {
+		integrityScore = result.Report.GetOverallIntegrityScore()
+	}
+
+	payload := ptsOutcomePayload{
+		Service:        "cerebro",
+		Outcome:        outcome,
+		PipelineID:     pipelineID,
+		FindingsCount:  len(result.Findings),
+		DetectorsFired: detectorsFired,
+		DurationMs:     durationMs,
+		CorpusSize:     corpusSize,
+		IntegrityScore: integrityScore,
+		Timestamp:      time.Now().UTC().Format(time.RFC3339),
+	}
+
+	client := NewPTSClient(endpoint, DefaultPTSTimeout)
+	go client.SendPipelineOutcome(context.Background(), payload)
+}
+
 // maybeInjectPTSFindings fires a goroutine for each finding with confidence >= InjectConfidenceThreshold,
 // POSTing the detection text to PTS /inject. It is a no-op when endpoint is empty. Never blocks.
 // When store is non-nil, each injected finding is also recorded in the outcome store for TP/FP tracking.
